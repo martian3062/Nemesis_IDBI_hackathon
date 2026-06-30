@@ -2,7 +2,7 @@
 
 Nemesis is an MSME Financial Health Card and creditworthiness intelligence console built for the IDBI Innovate hackathon. It takes inspiration from the Eraya self-healing agent-swarm architecture and applies that pattern to alternate-data MSME lending.
 
-The current repository contains a runnable React + TypeScript prototype that demonstrates the product experience: enterprise selection, six-dimensional health scoring, explainability, scenario simulation, guardian/security controls, and a federated-learning readiness view.
+The current repository contains a runnable full-stack prototype: a React + TypeScript operator console and a FastAPI backend that generates six-dimensional scores, reason codes, connector snapshots, Guardian policy findings, audit signatures, and federated-learning readiness metadata.
 
 ## One-Line Pitch
 
@@ -30,7 +30,7 @@ Nemesis acts as an "enterprise mirror" for MSME lending:
 
 ## Current Prototype
 
-The shipped prototype is a frontend-first operator console with the following sections:
+The shipped prototype includes a frontend console plus a backend scoring API.
 
 | Section | Purpose |
 | --- | --- |
@@ -39,6 +39,43 @@ The shipped prototype is a frontend-first operator console with the following se
 | Explainability | Shows reason codes, positive/negative score drivers, and counterfactual stress tests |
 | Guardian | Demonstrates consent, policy, injection-defense, and tamper-evident audit controls |
 | Federated | Shows a future multi-bank federated-learning view where model learning happens without raw data pooling |
+| Architecture | Shows the consent, feature, swarm, scoring, and lending-rail workflow |
+| API | Lists live backend endpoints and connector readiness |
+
+## Implemented Backend
+
+The `backend/` folder now contains a FastAPI service with deterministic scoring and mock integrations.
+
+| Module | What It Does |
+| --- | --- |
+| `backend/app/data.py` | Holds synthetic MSME records and scenario definitions |
+| `backend/app/connectors.py` | Simulates AA, GSTN, UPI, EPFO, bank statement, OCEN, and ULI payloads |
+| `backend/app/scoring.py` | Builds features, six score dimensions, composite score, reason codes, and benchmark metadata |
+| `backend/app/guardian.py` | Performs policy checks, prompt-injection detection, and HMAC audit signing |
+| `backend/app/pipeline.py` | Orchestrates connectors, scoring, Guardian review, events, architecture, and federated status |
+| `backend/app/main.py` | Exposes the FastAPI endpoints |
+
+### API Endpoints
+
+```text
+GET  /api/v1/health
+GET  /api/v1/enterprises
+GET  /api/v1/health-card?enterprise_id=suryam&scenario=baseline
+POST /api/v1/scenario/run
+GET  /api/v1/connectors/snapshot
+GET  /api/v1/audit/latest
+GET  /api/v1/federated/status
+GET  /api/v1/architecture
+```
+
+### Supported Scenarios
+
+```text
+baseline   Normal consented alternate-data scoring
+thinData   Missing/partial connector data with Recoverer fallback
+stress     Liquidity and concentration stress-test state
+attack     Prompt-injection and unsafe override simulation
+```
 
 ## Key Features
 
@@ -174,8 +211,8 @@ sequenceDiagram
 2. Data pull: GST, UPI, EPFO, bank, invoice, and document signals are fetched.
 3. Entity resolution: Business identity, account, GSTIN, employer, and invoice entities are matched.
 4. Normalization: Raw records are converted into monthly and transaction-level time series.
-5. Feature generation: More than 200 planned features can be derived across liquidity, compliance, growth, and concentration.
-6. Score calculation: The scoring cascade generates dimension scores and a composite score.
+5. Feature generation: The current backend derives liquidity, discipline, compliance, concentration, growth, working-capital, and data-quality features.
+6. Score calculation: The scoring cascade generates six dimension scores and a composite score.
 7. Explainability: Score drivers are converted into human-readable reason codes.
 8. Guardian review: Consent scope, policy rules, safety checks, and audit signing are applied.
 9. Delivery: The Health Card appears in the UI and can be sent into IDBI systems through APIs.
@@ -252,22 +289,34 @@ flowchart LR
 
 ```text
 Nemesis_IDBI_hackathon/
-├── public/
-│   ├── favicon.svg
-│   └── icons.svg
-├── src/
-│   ├── App.tsx          # Main Nemesis prototype UI
-│   ├── App.css          # Product dashboard styling
-│   ├── index.css        # Global CSS reset and app base
-│   └── main.tsx         # React entrypoint
-├── index.html
-├── package.json
-├── package-lock.json
-├── tsconfig.json
-├── tsconfig.app.json
-├── tsconfig.node.json
-├── vite.config.ts
-└── README.md
+|-- backend/
+|   |-- app/
+|   |   |-- connectors.py     # AA, GST, UPI, EPFO, OCEN, ULI mock connectors
+|   |   |-- data.py           # Synthetic MSME records
+|   |   |-- guardian.py       # Policy checks and HMAC audit signing
+|   |   |-- main.py           # FastAPI entrypoint
+|   |   |-- pipeline.py       # End-to-end health-card orchestration
+|   |   `-- scoring.py        # Feature engineering and six-dimension scoring
+|   |-- README.md
+|   `-- requirements.txt
+|-- data/
+|   `-- synthetic_msme_sample.csv
+|-- public/
+|   |-- favicon.svg
+|   `-- icons.svg
+|-- src/
+|   |-- lib/
+|   |   `-- nemesis-api.ts    # Frontend API client with fallback behavior
+|   |-- App.tsx              # Main Nemesis prototype UI
+|   |-- App.css              # Product dashboard styling
+|   |-- index.css            # Global CSS reset and app base
+|   `-- main.tsx             # React entrypoint
+|-- index.html
+|-- package.json
+|-- package-lock.json
+|-- tsconfig.json
+|-- vite.config.ts
+`-- README.md
 ```
 
 ## Technology Stack
@@ -280,6 +329,11 @@ Current prototype:
 - Lucide React icons
 - Custom SVG-based radar and sparkline visualizations
 - Responsive CSS for desktop and mobile layouts
+- FastAPI backend
+- deterministic MSME score engine
+- mock AA, GST, UPI, EPFO, OCEN, and ULI connector payloads
+- Guardian policy engine with HMAC audit signing
+- synthetic MSME data sample
 
 Target production stack:
 
@@ -300,7 +354,7 @@ Install dependencies:
 npm install
 ```
 
-Start the development server:
+Start the frontend:
 
 ```powershell
 npm run dev
@@ -312,6 +366,18 @@ Open the Vite URL shown in the terminal. The default is usually:
 http://localhost:5173
 ```
 
+Start the backend in a second terminal:
+
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+The frontend automatically uses `http://127.0.0.1:8000` when the backend is running. If the backend is off, the UI falls back to static demo data.
+
 ## Build
 
 ```powershell
@@ -322,6 +388,12 @@ npm run build
 
 ```powershell
 npm run lint
+```
+
+## Backend Validation
+
+```powershell
+python -m compileall backend
 ```
 
 ## Hackathon Slide Mapping
@@ -377,4 +449,4 @@ https://github.com/martian3062/Nemesis_IDBI_hackathon
 
 ## Status
 
-This repository currently contains a polished frontend prototype. Backend connectors, model training, real AA integration, and IDBI sandbox wiring are part of the target production architecture and roadmap.
+This repository currently contains a polished frontend prototype plus a runnable FastAPI backend with mock connectors, deterministic scoring, reason codes, Guardian audit signing, architecture metadata, and federated-learning status. Real AA/GSTN/NPCI/EPFO production credentials, model training on institution data, and IDBI sandbox wiring remain future integration work.

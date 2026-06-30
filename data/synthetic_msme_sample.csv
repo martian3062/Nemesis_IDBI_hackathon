@@ -1,0 +1,6 @@
+enterprise_id,name,sector,location,gst_filing_timeliness,gst_bank_reconciliation,upi_monthly_inflow_lakh,upi_volatility,bank_avg_balance_lakh,epfo_employee_count,top_buyer_share,revenue_growth_pct,dso_days,statement_months,default_label
+suryam,Suryam Precision Tools,Auto components,"Ludhiana, PB",0.97,0.94,36.8,0.18,11.6,23,0.43,16.0,41,14,0
+meghdoot,Meghdoot Agro Foods,Food processing,"Nashik, MH",0.88,0.86,18.4,0.32,5.2,11,0.61,10.0,56,9,0
+neelkanth,Neelkanth Textiles,Textile processing,"Surat, GJ",0.81,0.79,24.1,0.27,7.8,18,0.39,7.0,49,12,0
+vardhan,Vardhan Machine Works,Industrial tools,"Rajkot, GJ",0.74,0.71,12.3,0.44,3.1,8,0.67,2.0,68,7,1
+adya,Adya Packaging,Packaging,"Indore, MP",0.91,0.89,29.6,0.21,9.7,16,0.34,13.0,38,13,0

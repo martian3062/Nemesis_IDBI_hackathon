@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Zap,
 } from 'lucide-react'
+import { fetchHealthCard } from './lib/nemesis-api'
 import './App.css'
 
 type Dimension = {
@@ -45,6 +46,42 @@ type Enterprise = {
 }
 
 type Scenario = 'baseline' | 'thinData' | 'stress' | 'attack'
+
+type BackendAgent = {
+  name: string
+  role: string
+  tier: string
+  health: number
+  detail: string
+}
+
+type BackendHealthCard = {
+  scenario: { key: Scenario; label: string }
+  enterprise: Enterprise
+  connectors: Record<string, unknown>
+  guardian: {
+    verdict: string
+    audit_id: string
+    signature_preview: string
+    findings: { severity: string; rule: string; message: string }[]
+  }
+  benchmark: {
+    indicative_decision_ms: number
+    model_confidence: number
+    reason_code_coverage: string
+    synthetic_peer_percentile: number
+    tier_used: string
+  }
+  swarm_agents: BackendAgent[]
+  events: string[]
+  federated_rounds: { bank: string; auc: string; drift: string; samples: string }[]
+  architecture_nodes: {
+    layer: string
+    name: string
+    components: string[]
+    status: string
+  }[]
+}
 
 const enterprises: Enterprise[] = [
   {
@@ -257,6 +294,8 @@ const navItems = [
   { key: 'explain', label: 'Explainability', icon: Eye },
   { key: 'security', label: 'Guardian', icon: LockKeyhole },
   { key: 'federated', label: 'Federated', icon: Landmark },
+  { key: 'architecture', label: 'Architecture', icon: DatabaseZap },
+  { key: 'api', label: 'API', icon: Activity },
 ] as const
 
 function scenarioOffset(scenario: Scenario) {
@@ -361,39 +400,76 @@ function App() {
   const [activeTab, setActiveTab] = useState<(typeof navItems)[number]['key']>('health')
   const [scenario, setScenario] = useState<Scenario>('baseline')
   const [runCount, setRunCount] = useState(1)
+  const [apiCard, setApiCard] = useState<BackendHealthCard | null>(null)
+  const [apiStatus, setApiStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting')
 
-  const enterprise = enterprises.find((item) => item.id === selectedId) ?? enterprises[0]
-  const activeScore = clampScore(enterprise.composite + scenarioOffset(scenario))
+  useEffect(() => {
+    let cancelled = false
+    setApiStatus('connecting')
+
+    fetchHealthCard(selectedId, scenario)
+      .then((card: BackendHealthCard) => {
+        if (!cancelled) {
+          setApiCard(card)
+          setApiStatus('live')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setApiCard(null)
+          setApiStatus('fallback')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, scenario])
+
+  const fallbackEnterprise = enterprises.find((item) => item.id === selectedId) ?? enterprises[0]
+  const enterprise = apiCard?.enterprise ?? fallbackEnterprise
+  const activeScore = apiCard ? enterprise.composite : clampScore(enterprise.composite + scenarioOffset(scenario))
   const activeTone = scoreTone(activeScore)
   const adjustedDimensions = useMemo(
     () =>
-      enterprise.dimensions.map((dimension, index) => ({
-        ...dimension,
-        value: clampScore(
-          dimension.value +
-            scenarioOffset(scenario) +
-            (scenario === 'thinData' && index % 2 === 0 ? -4 : 0) +
-            (scenario === 'attack' && dimension.label.includes('Compliance') ? -15 : 0),
-        ),
-      })),
-    [enterprise, scenario],
+      apiCard
+        ? enterprise.dimensions
+        : enterprise.dimensions.map((dimension, index) => ({
+            ...dimension,
+            value: clampScore(
+              dimension.value +
+                scenarioOffset(scenario) +
+                (scenario === 'thinData' && index % 2 === 0 ? -4 : 0) +
+                (scenario === 'attack' && dimension.label.includes('Compliance') ? -15 : 0),
+            ),
+          })),
+    [apiCard, enterprise, scenario],
   )
 
   const guardianVerdict =
-    scenario === 'attack'
+    apiCard?.guardian.verdict ??
+    (scenario === 'attack'
       ? 'Blocked prompt injection and spoofed planner identity'
       : scenario === 'stress'
         ? 'Warned: exposure cap and collateral routing required'
-        : 'Approved with signed audit seal'
+        : 'Approved with signed audit seal')
 
   const scenarioLabel =
-    scenario === 'baseline'
+    apiCard?.scenario.label ??
+    (scenario === 'baseline'
       ? 'Baseline'
       : scenario === 'thinData'
         ? 'Thin data'
         : scenario === 'stress'
           ? 'Stress test'
-          : 'Attack sim'
+          : 'Attack sim')
+
+  const renderedAgents = (apiCard?.swarm_agents ?? swarmAgents).map((agent) => {
+    const staticAgent = swarmAgents.find((item) => item.name === agent.name)
+    return { ...agent, icon: staticAgent?.icon ?? Network }
+  })
+  const renderedEvents = apiCard?.events ?? events
+  const renderedFederatedRounds = apiCard?.federated_rounds ?? federatedRounds
 
   return (
     <main className="app-shell">
@@ -428,6 +504,11 @@ function App() {
 
         <div className="sidebar-panel">
           <p className="eyebrow">Live decision clock</p>
+          <div className="metric-row">
+            <DatabaseZap size={18} />
+            <strong>{apiStatus === 'live' ? 'API' : apiStatus === 'connecting' ? '...' : 'UI'}</strong>
+            <span>{apiStatus === 'live' ? 'live backend' : apiStatus === 'connecting' ? 'connecting' : 'static fallback'}</span>
+          </div>
           <div className="metric-row">
             <Clock3 size={18} />
             <strong>00:48</strong>
@@ -570,7 +651,7 @@ function App() {
                 <Network size={22} />
               </div>
               <div className="agent-grid">
-                {swarmAgents.map((agent) => {
+                {renderedAgents.map((agent) => {
                   const Icon = agent.icon
                   return (
                     <div key={agent.name} className="agent-tile">
@@ -601,7 +682,7 @@ function App() {
                 <GitBranch size={22} />
               </div>
               <ol className="event-list">
-                {events.map((event, index) => (
+                {renderedEvents.map((event, index) => (
                   <li key={event}>
                     <span>{index + 1}</span>
                     <p>{event}</p>
@@ -703,13 +784,14 @@ function App() {
                 <ShieldCheck size={22} />
               </div>
               <p className="audit-copy">
-                {scenario === 'attack'
+                {apiCard?.guardian.findings[0]?.message ??
+                  (scenario === 'attack'
                   ? 'A spoofed planner attempted to override exposure caps. Guardian rejected the message, quarantined the action path, and issued a signed audit record.'
-                  : 'Guardian is monitoring consent drift, prompt injection, high-risk exposure, and incomplete-data overrides.'}
+                  : 'Guardian is monitoring consent drift, prompt injection, high-risk exposure, and incomplete-data overrides.')}
               </p>
               <div className="audit-seal">
                 <span>Audit seal</span>
-                <strong>nemesis-{runCount.toString().padStart(4, '0')}-a9f3c1</strong>
+                <strong>{apiCard?.guardian.signature_preview ?? `nemesis-${runCount.toString().padStart(4, '0')}-a9f3c1`}</strong>
               </div>
             </article>
           </section>
@@ -732,7 +814,7 @@ function App() {
                   <span>Drift</span>
                   <span>Samples</span>
                 </div>
-                {federatedRounds.map((round) => (
+                {renderedFederatedRounds.map((round) => (
                   <div key={round.bank} className="table-row">
                     <strong>{round.bank}</strong>
                     <span>{round.auc}</span>
@@ -754,6 +836,143 @@ function App() {
               <div className="connector-list">
                 {['AA consent', 'GSTN', 'NPCI UPI', 'EPFO', 'OCEN', 'ULI'].map((connector) => (
                   <span key={connector}>{connector}</span>
+                ))}
+              </div>
+            </article>
+          </section>
+        )}
+
+        {activeTab === 'architecture' && (
+          <section className="content-grid">
+            <article className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">System architecture</p>
+                  <h3>Consent to health-card workflow</h3>
+                </div>
+                <DatabaseZap size={22} />
+              </div>
+              <div className="architecture-flow">
+                {(apiCard?.architecture_nodes ?? [
+                  {
+                    layer: 'L1',
+                    name: 'Consent and source connectors',
+                    components: ['AA', 'GSTN', 'NPCI UPI', 'EPFO', 'Bank parser'],
+                    status: 'mocked in backend',
+                  },
+                  {
+                    layer: 'L2',
+                    name: 'Feature engineering',
+                    components: ['cashflow', 'compliance', 'concentration', 'working capital'],
+                    status: 'deterministic prototype',
+                  },
+                  {
+                    layer: 'L3',
+                    name: 'Swarm and scoring',
+                    components: ['Perceiver', 'Planner', 'Guardian', 'Recoverer'],
+                    status: 'orchestrated scoring pipeline',
+                  },
+                  {
+                    layer: 'L4',
+                    name: 'Delivery and lending rails',
+                    components: ['Health Card UI', 'OCEN', 'ULI', 'LOS handoff'],
+                    status: 'API-ready stubs',
+                  },
+                ]).map((node) => (
+                  <div key={node.layer} className="architecture-node">
+                    <b>{node.layer}</b>
+                    <div>
+                      <strong>{node.name}</strong>
+                      <span>{node.components.join(' / ')}</span>
+                      <small>{node.status}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="panel compact-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Benchmark</p>
+                  <h3>Decision readiness</h3>
+                </div>
+                <Activity size={22} />
+              </div>
+              <div className="benchmark-list">
+                <div>
+                  <span>Indicative decision</span>
+                  <strong>
+                    {apiCard ? `${Math.round(apiCard.benchmark.indicative_decision_ms / 1000)}s` : '<90s'}
+                  </strong>
+                </div>
+                <div>
+                  <span>Model confidence</span>
+                  <strong>{apiCard ? `${Math.round(apiCard.benchmark.model_confidence * 100)}%` : '86%'}</strong>
+                </div>
+                <div>
+                  <span>Reason coverage</span>
+                  <strong>{apiCard?.benchmark.reason_code_coverage ?? '100%'}</strong>
+                </div>
+                <div>
+                  <span>Cascade tier</span>
+                  <strong>{apiCard?.benchmark.tier_used ?? 'tier2_tabular'}</strong>
+                </div>
+              </div>
+            </article>
+          </section>
+        )}
+
+        {activeTab === 'api' && (
+          <section className="content-grid two-column">
+            <article className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Backend API</p>
+                  <h3>Runnable endpoints</h3>
+                </div>
+                <DatabaseZap size={22} />
+              </div>
+              <div className="endpoint-list">
+                {[
+                  ['GET', '/api/v1/health-card', 'Generate score, reason codes, connector snapshot, and Guardian audit'],
+                  ['POST', '/api/v1/scenario/run', 'Run baseline, thinData, stress, or attack simulation'],
+                  ['GET', '/api/v1/connectors/snapshot', 'Inspect AA, GST, UPI, EPFO, OCEN, and ULI payloads'],
+                  ['GET', '/api/v1/audit/latest', 'Return latest signed Guardian decision envelope'],
+                  ['GET', '/api/v1/federated/status', 'Show multi-node model-readiness status'],
+                ].map(([method, path, detail]) => (
+                  <div key={path} className="endpoint-row">
+                    <b>{method}</b>
+                    <div>
+                      <strong>{path}</strong>
+                      <span>{detail}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Connector status</p>
+                  <h3>{apiStatus === 'live' ? 'Live snapshot' : 'Fallback preview'}</h3>
+                </div>
+                <CheckCircle2 size={22} />
+              </div>
+              <div className="connector-health">
+                {[
+                  ['AA consent', apiCard?.connectors.account_aggregator ? 'active' : 'ready'],
+                  ['GSTN', apiCard?.connectors.gst ? 'available' : 'mock'],
+                  ['NPCI UPI', apiCard?.connectors.upi ? 'available' : 'mock'],
+                  ['EPFO', apiCard?.connectors.epfo ? 'scoped' : 'mock'],
+                  ['OCEN', apiCard?.connectors.ocen ? 'payload ready' : 'stub'],
+                  ['ULI', apiCard?.connectors.uli ? 'payload ready' : 'stub'],
+                ].map(([name, status]) => (
+                  <div key={name} className="connector-health-row">
+                    <strong>{name}</strong>
+                    <span>{status}</span>
+                  </div>
                 ))}
               </div>
             </article>
