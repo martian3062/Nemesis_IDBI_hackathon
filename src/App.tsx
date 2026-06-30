@@ -20,7 +20,7 @@ import {
   ShieldCheck,
   Zap,
 } from 'lucide-react'
-import { fetchHealthCard } from './lib/nemesis-api'
+import { fetchHealthCard, fetchIntegrationSummary } from './lib/nemesis-api'
 import './App.css'
 
 type Dimension = {
@@ -81,6 +81,19 @@ type BackendHealthCard = {
     components: string[]
     status: string
   }[]
+}
+
+type IntegrationSummary = {
+  catalog: Array<Record<string, string>>
+  credit_memo: Record<string, any>
+  external_verification: Record<string, any>
+  analytics_event: Record<string, any>
+  policy: Record<string, any>
+  model_monitor: Record<string, any>
+  data_quality: Record<string, any>
+  document_intelligence: Record<string, any>
+  memory: Record<string, any>
+  operations: Record<string, any>
 }
 
 const enterprises: Enterprise[] = [
@@ -296,6 +309,7 @@ const navItems = [
   { key: 'federated', label: 'Federated', icon: Landmark },
   { key: 'architecture', label: 'Architecture', icon: DatabaseZap },
   { key: 'api', label: 'API', icon: Activity },
+  { key: 'integrations', label: 'Integrations', icon: Zap },
 ] as const
 
 function scenarioOffset(scenario: Scenario) {
@@ -401,6 +415,7 @@ function App() {
   const [scenario, setScenario] = useState<Scenario>('baseline')
   const [runCount, setRunCount] = useState(1)
   const [apiCard, setApiCard] = useState<BackendHealthCard | null>(null)
+  const [integrationSummary, setIntegrationSummary] = useState<IntegrationSummary | null>(null)
   const [apiStatus, setApiStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting')
 
   useEffect(() => {
@@ -418,6 +433,26 @@ function App() {
         if (!cancelled) {
           setApiCard(null)
           setApiStatus('fallback')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, scenario])
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetchIntegrationSummary(selectedId, scenario)
+      .then((summary: IntegrationSummary) => {
+        if (!cancelled) {
+          setIntegrationSummary(summary)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIntegrationSummary(null)
         }
       })
 
@@ -974,6 +1009,140 @@ function App() {
                     <span>{status}</span>
                   </div>
                 ))}
+              </div>
+            </article>
+          </section>
+        )}
+
+        {activeTab === 'integrations' && (
+          <section className="content-grid two-column">
+            <article className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">AI credit officer</p>
+                  <h3>{integrationSummary?.credit_memo.tool ?? 'Groq AI'} memo pipeline</h3>
+                </div>
+                <Zap size={22} />
+              </div>
+              <div className="memo-panel">
+                <span className="mode-pill">{integrationSummary?.credit_memo.mode ?? 'fallback'}</span>
+                <strong>
+                  {integrationSummary?.credit_memo.memo.summary ??
+                    `${enterprise.name} has a policy-checked score and is ready for credit memo generation.`}
+                </strong>
+                <div className="memo-columns">
+                  <div>
+                    <span>Mitigants</span>
+                    {(integrationSummary?.credit_memo.memo.mitigants ?? [
+                      'Cap exposure until buyer concentration improves.',
+                      'Monitor monthly GST-bank reconciliation.',
+                    ]).map((item: string) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                  <div>
+                    <span>Borrower advice</span>
+                    {(integrationSummary?.credit_memo.memo.borrower_advice ?? [
+                      'Improve receivable cycles.',
+                      'Grow repeat customers across more buyers.',
+                    ]).map((item: string) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="integration-catalog">
+                {(integrationSummary?.catalog ?? [
+                  {
+                    name: 'Groq AI',
+                    category: 'AI credit officer',
+                    status: 'fallback',
+                    purpose: 'Generate structured credit memo and planner rationale.',
+                  },
+                  {
+                    name: 'Firecrawl',
+                    category: 'External verification',
+                    status: 'fallback',
+                    purpose: 'Verify MSME web footprint and supplier context.',
+                  },
+                  {
+                    name: 'OPA',
+                    category: 'Policy engine',
+                    status: 'local-rules',
+                    purpose: 'Evaluate underwriting policies.',
+                  },
+                ]).map((tool) => (
+                  <div key={tool.name} className="integration-row">
+                    <div>
+                      <strong>{tool.name}</strong>
+                      <span>{tool.category}</span>
+                      <p>{tool.purpose}</p>
+                    </div>
+                    <b>{tool.status}</b>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Ops and verification</p>
+                  <h3>Hackathon readiness stack</h3>
+                </div>
+                <ShieldCheck size={22} />
+              </div>
+              <div className="ops-grid">
+                <div>
+                  <span>Firecrawl verification</span>
+                  <strong>{integrationSummary?.external_verification.mode ?? 'fallback'}</strong>
+                  {(integrationSummary?.external_verification.signals ?? ['External signal fallback is ready.']).map((signal: string) => (
+                    <p key={signal}>{signal}</p>
+                  ))}
+                </div>
+                <div>
+                  <span>OPA policy</span>
+                  <strong>{integrationSummary?.policy.mode ?? 'local-rules'}</strong>
+                  <p>
+                    {integrationSummary?.policy.result.reason ??
+                      `Allow: ${String(integrationSummary?.policy.result.allow ?? activeScore >= 62)}`}
+                  </p>
+                </div>
+                <div>
+                  <span>Evidently monitor</span>
+                  <strong>{integrationSummary?.model_monitor.score_mean ?? activeScore}</strong>
+                  <p>Mean score with confidence {integrationSummary?.model_monitor.confidence_mean ?? '0.86'}</p>
+                </div>
+                <div>
+                  <span>Great Expectations</span>
+                  <strong>
+                    {integrationSummary
+                      ? `${integrationSummary.data_quality.expectations.length} suites`
+                      : 'contracts'}
+                  </strong>
+                  <p>Connector quality gates for GST, UPI, EPFO, and bank data.</p>
+                </div>
+                <div>
+                  <span>Doc intelligence</span>
+                  <strong>{integrationSummary?.document_intelligence.supported_docs.length ?? 4} docs</strong>
+                  <p>Invoice, statement, GST, and purchase-order parsing contract.</p>
+                </div>
+                <div>
+                  <span>Vector memory</span>
+                  <strong>{typeof integrationSummary?.memory.qdrant_status === 'string' ? integrationSummary.memory.qdrant_status : 'online'}</strong>
+                  <p>{(integrationSummary?.memory.collections ?? ['credit_memos', 'policy_docs']).join(', ')}</p>
+                </div>
+                <div>
+                  <span>Observability</span>
+                  <strong>{integrationSummary?.operations.observability.tool ?? 'OpenTelemetry'}</strong>
+                  <p>{(integrationSummary?.operations.observability.metrics ?? ['score_runs', 'guardian_blocks']).slice(0, 2).join(', ')}</p>
+                </div>
+                <div>
+                  <span>Storage / workspace</span>
+                  <strong>{integrationSummary?.operations.storage.tool ?? 'MinIO'} + Zerve</strong>
+                  <p>Health-card exports, docs, notebooks, and validation workflows.</p>
+                </div>
               </div>
             </article>
           </section>

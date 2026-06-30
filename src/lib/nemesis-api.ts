@@ -12,3 +12,15 @@ export async function fetchHealthCard(enterpriseId: string, scenario: string) {
   }
   return response.json()
 }
+
+export async function fetchIntegrationSummary(enterpriseId: string, scenario: string) {
+  const url = new URL('/api/v1/integrations/summary', NEMESIS_API_BASE)
+  url.searchParams.set('enterprise_id', enterpriseId)
+  url.searchParams.set('scenario', scenario)
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Nemesis integrations API returned ${response.status}`)
+  }
+  return response.json()
+}

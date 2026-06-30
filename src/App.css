@@ -707,6 +707,109 @@ select {
   font-weight: 800;
 }
 
+.memo-panel {
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fbff, #ffffff);
+  margin-bottom: 14px;
+}
+
+.memo-panel > strong {
+  display: block;
+  margin-top: 10px;
+  color: #101820;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.mode-pill {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #286bff;
+  background: #e8f0ff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.memo-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.memo-columns span,
+.ops-grid span,
+.integration-row span {
+  display: block;
+  color: #687384;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.memo-columns p,
+.integration-row p,
+.ops-grid p {
+  margin-top: 7px;
+  color: #536070;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.integration-catalog,
+.ops-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.integration-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfe;
+}
+
+.integration-row strong,
+.ops-grid strong {
+  display: block;
+  color: #101820;
+}
+
+.integration-row b {
+  height: fit-content;
+  border-radius: 999px;
+  padding: 6px 9px;
+  color: #0b3b33;
+  background: #ddfff6;
+  font-size: 0.78rem;
+}
+
+.ops-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ops-grid div {
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfe;
+}
+
+.ops-grid strong {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 236px minmax(0, 1fr);
@@ -772,6 +875,8 @@ select {
   .agent-grid,
   .feature-grid,
   .stress-grid,
+  .memo-columns,
+  .ops-grid,
   .radar-layout {
     grid-template-columns: 1fr;
   }

@@ -11,6 +11,7 @@ It provides a runnable API surface for:
 - Account Aggregator, GST, UPI, EPFO, OCEN, and ULI mock connector snapshots
 - federated-learning readiness status
 - architecture metadata for the frontend
+- Groq, Firecrawl, Tinybird, OPA, monitoring, privacy, vector memory, storage, and workflow integration adapters
 
 ## Run
 
@@ -33,6 +34,16 @@ GET  /api/v1/connectors/snapshot
 GET  /api/v1/audit/latest
 GET  /api/v1/federated/status
 GET  /api/v1/architecture
+GET  /api/v1/integrations/summary
+GET  /api/v1/ai/credit-memo
+GET  /api/v1/verification/external
+GET  /api/v1/policy/check
+GET  /api/v1/model/monitor
+GET  /api/v1/data-quality
+GET  /api/v1/document-intelligence
+GET  /api/v1/memory/status
+GET  /api/v1/ops/status
+POST /api/v1/privacy/redact
 ```
 
 ## Scenarios
@@ -45,3 +56,20 @@ attack
 ```
 
 The frontend can run without this backend because it has a static fallback, but when this API is running the dashboard uses live scored responses.
+
+## Optional Live Integrations
+
+Set these environment variables to enable live providers. Without them, the API returns deterministic fallback payloads.
+
+```text
+GROQ_API_KEY
+FIRECRAWL_API_KEY
+TINYBIRD_TOKEN
+TINYBIRD_EVENTS_URL
+OPA_URL
+QDRANT_URL
+CHROMA_URL
+MINIO_ENDPOINT
+OTEL_EXPORTER_OTLP_ENDPOINT
+ZERVE_WORKSPACE_URL
+```

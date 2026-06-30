@@ -41,6 +41,7 @@ The shipped prototype includes a frontend console plus a backend scoring API.
 | Federated | Shows a future multi-bank federated-learning view where model learning happens without raw data pooling |
 | Architecture | Shows the consent, feature, swarm, scoring, and lending-rail workflow |
 | API | Lists live backend endpoints and connector readiness |
+| Integrations | Shows Groq, Firecrawl, Tinybird, OPA, SHAP, Great Expectations, Evidently, Qdrant/Chroma, OpenTelemetry, Presidio, Docling/Unstructured, MinIO, Zerve, and LangGraph readiness |
 
 ## Implemented Backend
 
@@ -52,6 +53,7 @@ The `backend/` folder now contains a FastAPI service with deterministic scoring 
 | `backend/app/connectors.py` | Simulates AA, GSTN, UPI, EPFO, bank statement, OCEN, and ULI payloads |
 | `backend/app/scoring.py` | Builds features, six score dimensions, composite score, reason codes, and benchmark metadata |
 | `backend/app/guardian.py` | Performs policy checks, prompt-injection detection, and HMAC audit signing |
+| `backend/app/integrations.py` | Optional AI, web verification, analytics, policy, monitoring, privacy, vector memory, document, storage, and workspace adapters |
 | `backend/app/pipeline.py` | Orchestrates connectors, scoring, Guardian review, events, architecture, and federated status |
 | `backend/app/main.py` | Exposes the FastAPI endpoints |
 
@@ -66,6 +68,18 @@ GET  /api/v1/connectors/snapshot
 GET  /api/v1/audit/latest
 GET  /api/v1/federated/status
 GET  /api/v1/architecture
+GET  /api/v1/integrations/catalog
+GET  /api/v1/integrations/summary
+GET  /api/v1/ai/credit-memo
+GET  /api/v1/verification/external
+POST /api/v1/analytics/event
+GET  /api/v1/policy/check
+GET  /api/v1/model/monitor
+GET  /api/v1/data-quality
+GET  /api/v1/document-intelligence
+GET  /api/v1/memory/status
+GET  /api/v1/ops/status
+POST /api/v1/privacy/redact
 ```
 
 ### Supported Scenarios
@@ -93,6 +107,38 @@ attack     Prompt-injection and unsafe override simulation
 - Guardian audit seal for policy-checked decisions.
 - Agent-swarm architecture inspired by Eraya.
 - Federated-learning concept for cross-bank model improvement without raw-data sharing.
+- Optional AI credit memo through Groq with deterministic fallback.
+- Optional external MSME verification through Firecrawl with fallback signals.
+- Tinybird-ready scoring event stream.
+- OPA-ready external policy evaluation with local rules fallback.
+- Great Expectations-style data quality contracts.
+- Evidently-style model monitor snapshot.
+- Presidio-compatible PII redaction fallback.
+- Qdrant/Chroma vector-memory readiness.
+- MinIO document/export storage readiness.
+- OpenTelemetry, Prometheus, Grafana, and Jaeger observability-ready services.
+- Zerve and LangGraph workflow readiness.
+
+## Advanced Tool Integrations
+
+All advanced integrations are demo-safe. If the API key or service is present, Nemesis uses the live adapter. If it is absent, Nemesis returns a structured fallback response so the hackathon flow still works.
+
+| Tool | Nemesis Use | Live Unlock |
+| --- | --- | --- |
+| Groq AI | AI credit officer memo, planner rationale, borrower improvement advice | `GROQ_API_KEY` |
+| Firecrawl | External web footprint and supplier/context verification | `FIRECRAWL_API_KEY` |
+| Tinybird | Real-time scoring and Guardian event analytics | `TINYBIRD_TOKEN`, `TINYBIRD_EVENTS_URL` |
+| Open Policy Agent | External Rego policy checks for consent and auto-approval | `OPA_URL` |
+| SHAP | Future model-attribution upgrade for current reason codes | Python ML layer |
+| Great Expectations | Connector and feature data-quality validation contracts | Local contracts |
+| Evidently AI | Score drift, confidence drift, and monitoring reports | Local snapshot / future reports |
+| Qdrant / Chroma | Vector memory for credit memos, policy docs, profiles, templates | Docker or URLs |
+| OpenTelemetry + Grafana | Agent and scoring observability | Docker Compose |
+| Presidio | PII redaction before logs, prompts, and audit exports | Regex fallback now |
+| Docling / Unstructured | Invoice, statement, GST, and purchase-order parsing | Contract stub now |
+| MinIO | Object storage for documents and health-card exports | Docker Compose |
+| Zerve | Data science workflows and score experiment workspaces | `ZERVE_WORKSPACE_URL` |
+| LangGraph | Future graph orchestration for Perceiver -> Planner -> Guardian -> Recoverer | Design-ready |
 
 ## Architecture
 
@@ -294,6 +340,7 @@ Nemesis_IDBI_hackathon/
 |   |   |-- connectors.py     # AA, GST, UPI, EPFO, OCEN, ULI mock connectors
 |   |   |-- data.py           # Synthetic MSME records
 |   |   |-- guardian.py       # Policy checks and HMAC audit signing
+|   |   |-- integrations.py   # Optional Groq, Firecrawl, Tinybird, OPA, monitoring, memory adapters
 |   |   |-- main.py           # FastAPI entrypoint
 |   |   |-- pipeline.py       # End-to-end health-card orchestration
 |   |   `-- scoring.py        # Feature engineering and six-dimension scoring
@@ -301,6 +348,10 @@ Nemesis_IDBI_hackathon/
 |   `-- requirements.txt
 |-- data/
 |   `-- synthetic_msme_sample.csv
+|-- ops/
+|   |-- opa/
+|   |   `-- underwriting.rego
+|   `-- prometheus.yml
 |-- public/
 |   |-- favicon.svg
 |   `-- icons.svg
@@ -312,6 +363,9 @@ Nemesis_IDBI_hackathon/
 |   |-- index.css            # Global CSS reset and app base
 |   `-- main.tsx             # React entrypoint
 |-- index.html
+|-- docker-compose.yml
+|-- Dockerfile.frontend
+|-- .env.example
 |-- package.json
 |-- package-lock.json
 |-- tsconfig.json
@@ -334,6 +388,7 @@ Current prototype:
 - mock AA, GST, UPI, EPFO, OCEN, and ULI connector payloads
 - Guardian policy engine with HMAC audit signing
 - synthetic MSME data sample
+- Docker Compose stack for backend, frontend, OPA, Qdrant, Chroma, MinIO, Prometheus, Grafana, and Jaeger
 
 Target production stack:
 
@@ -377,6 +432,41 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 The frontend automatically uses `http://127.0.0.1:8000` when the backend is running. If the backend is off, the UI falls back to static demo data.
+
+## Full Integrated Demo Stack
+
+Copy environment placeholders:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Start the full stack:
+
+```powershell
+npm run compose:up
+```
+
+Services:
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:5173` |
+| Backend API | `http://localhost:8000/docs` |
+| OPA | `http://localhost:8181` |
+| Qdrant | `http://localhost:6333` |
+| Chroma | `http://localhost:8001` |
+| MinIO API | `http://localhost:9000` |
+| MinIO Console | `http://localhost:9001` |
+| Prometheus | `http://localhost:9090` |
+| Grafana | `http://localhost:3001` |
+| Jaeger | `http://localhost:16686` |
+
+Stop the stack:
+
+```powershell
+npm run compose:down
+```
 
 ## Build
 
