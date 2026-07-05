@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
-  AlertTriangle,
+  ArrowDown,
+  ArrowLeft,
   Banknote,
   Building2,
-  CheckCircle2,
-  Clock3,
   DatabaseZap,
-  Eye,
-  FileCheck2,
   Gauge,
   GitBranch,
-  Landmark,
   LineChart,
-  LockKeyhole,
   Network,
   Play,
   RefreshCw,
   ShieldCheck,
-  Zap,
 } from 'lucide-react'
 import { fetchHealthCard, fetchIntegrationSummary } from './lib/nemesis-api'
 import './App.css'
@@ -84,16 +78,29 @@ type BackendHealthCard = {
 }
 
 type IntegrationSummary = {
-  catalog: Array<Record<string, string>>
-  credit_memo: Record<string, any>
-  external_verification: Record<string, any>
-  analytics_event: Record<string, any>
-  policy: Record<string, any>
-  model_monitor: Record<string, any>
-  data_quality: Record<string, any>
-  document_intelligence: Record<string, any>
-  memory: Record<string, any>
-  operations: Record<string, any>
+  catalog: Array<{ name: string; category: string; status: string; purpose: string }>
+  credit_memo: {
+    tool: string
+    mode: string
+    memo: {
+      summary: string
+      decision: string
+      mitigants: string[]
+      borrower_advice: string[]
+    }
+  }
+  external_verification: { tool: string; mode: string; signals: string[] }
+  policy: { tool: string; mode: string; result: { allow?: boolean; reason?: string } }
+  model_monitor: { score_mean?: number; confidence_mean?: number; drift_alerts?: string[] }
+  data_quality: { expectations?: { enterprise_id: string; passed: number; total: number }[] }
+  document_intelligence: { supported_docs?: string[]; extracted_fields?: string[] }
+  memory: { qdrant_status?: string | Record<string, unknown>; collections?: string[] }
+  operations: {
+    observability?: { tool?: string; metrics?: string[] }
+    storage?: { tool?: string; buckets?: string[] }
+    workspace?: { tool?: string; workflows?: string[] }
+    agent_graph?: { tool?: string; nodes?: string[] }
+  }
 }
 
 const enterprises: Enterprise[] = [
@@ -106,48 +113,12 @@ const enterprises: Enterprise[] = [
     composite: 82,
     decision: 'Indicative approve',
     dimensions: [
-      {
-        label: 'Cashflow Liquidity',
-        value: 84,
-        delta: '+7',
-        signal: 'UPI inflow volatility down 18%',
-        tone: 'good',
-      },
-      {
-        label: 'Credit Discipline',
-        value: 78,
-        delta: '+3',
-        signal: 'No cheque bounce in 180 days',
-        tone: 'good',
-      },
-      {
-        label: 'Compliance Health',
-        value: 91,
-        delta: '+11',
-        signal: 'GST filings on time for 12 months',
-        tone: 'good',
-      },
-      {
-        label: 'Concentration Risk',
-        value: 63,
-        delta: '-4',
-        signal: 'Top buyer contributes 43% revenue',
-        tone: 'watch',
-      },
-      {
-        label: 'Growth Trajectory',
-        value: 86,
-        delta: '+14',
-        signal: 'Quarterly GST sales CAGR 16%',
-        tone: 'good',
-      },
-      {
-        label: 'Working Capital Efficiency',
-        value: 72,
-        delta: '+5',
-        signal: 'DSO improved from 54 to 41 days',
-        tone: 'watch',
-      },
+      { label: 'Cashflow Liquidity', value: 84, delta: '+7', signal: 'UPI inflow volatility down 18%', tone: 'good' },
+      { label: 'Credit Discipline', value: 78, delta: '+3', signal: 'No cheque bounce in 180 days', tone: 'good' },
+      { label: 'Compliance Health', value: 91, delta: '+11', signal: 'GST filings on time for 12 months', tone: 'good' },
+      { label: 'Concentration Risk', value: 63, delta: '-4', signal: 'Top buyer contributes 43% revenue', tone: 'watch' },
+      { label: 'Growth Trajectory', value: 86, delta: '+14', signal: 'Quarterly GST sales CAGR 16%', tone: 'good' },
+      { label: 'Working Capital Efficiency', value: 72, delta: '+5', signal: 'DSO improved from 54 to 41 days', tone: 'watch' },
     ],
     features: [
       { label: 'GST consistency', value: '97%', status: 'verified' },
@@ -156,21 +127,9 @@ const enterprises: Enterprise[] = [
       { label: 'Bank statement coverage', value: '14 months', status: 'complete' },
     ],
     reasons: [
-      {
-        factor: 'GST filing regularity',
-        impact: 13,
-        text: 'Monthly returns align with reported bank inflows and reduce documentation risk.',
-      },
-      {
-        factor: 'Buyer concentration',
-        impact: -8,
-        text: 'One anchor buyer dominates receipts, so the guardian caps the initial exposure.',
-      },
-      {
-        factor: 'Salary stability',
-        impact: 6,
-        text: 'EPFO deposits show stable payroll and lower operational churn.',
-      },
+      { factor: 'GST filing regularity', impact: 13, text: 'Monthly returns align with reported bank inflows and reduce documentation risk.' },
+      { factor: 'Buyer concentration', impact: -8, text: 'One anchor buyer dominates receipts, so the Guardian caps the initial exposure.' },
+      { factor: 'Salary stability', impact: 6, text: 'EPFO deposits show stable payroll and lower operational churn.' },
     ],
     cashflow: [45, 51, 56, 61, 58, 67, 72, 78, 82, 85, 91, 96],
   },
@@ -183,48 +142,12 @@ const enterprises: Enterprise[] = [
     composite: 69,
     decision: 'Review with mitigants',
     dimensions: [
-      {
-        label: 'Cashflow Liquidity',
-        value: 68,
-        delta: '+2',
-        signal: 'Seasonal inflows, high harvest variance',
-        tone: 'watch',
-      },
-      {
-        label: 'Credit Discipline',
-        value: 74,
-        delta: '+6',
-        signal: 'One EMI delay, cured in 5 days',
-        tone: 'watch',
-      },
-      {
-        label: 'Compliance Health',
-        value: 81,
-        delta: '+9',
-        signal: 'GST regular after April correction',
-        tone: 'good',
-      },
-      {
-        label: 'Concentration Risk',
-        value: 52,
-        delta: '-12',
-        signal: 'Two buyers carry 61% of invoices',
-        tone: 'risk',
-      },
-      {
-        label: 'Growth Trajectory',
-        value: 76,
-        delta: '+10',
-        signal: 'Rising UPI wholesale receipts',
-        tone: 'good',
-      },
-      {
-        label: 'Working Capital Efficiency',
-        value: 62,
-        delta: '-3',
-        signal: 'Inventory cycle lengthened by 9 days',
-        tone: 'watch',
-      },
+      { label: 'Cashflow Liquidity', value: 68, delta: '+2', signal: 'Seasonal inflows, high harvest variance', tone: 'watch' },
+      { label: 'Credit Discipline', value: 74, delta: '+6', signal: 'One EMI delay, cured in 5 days', tone: 'watch' },
+      { label: 'Compliance Health', value: 81, delta: '+9', signal: 'GST regular after April correction', tone: 'good' },
+      { label: 'Concentration Risk', value: 52, delta: '-12', signal: 'Two buyers carry 61% of invoices', tone: 'risk' },
+      { label: 'Growth Trajectory', value: 76, delta: '+10', signal: 'Rising UPI wholesale receipts', tone: 'good' },
+      { label: 'Working Capital Efficiency', value: 62, delta: '-3', signal: 'Inventory cycle lengthened by 9 days', tone: 'watch' },
     ],
     features: [
       { label: 'GST consistency', value: '88%', status: 'verified' },
@@ -233,27 +156,15 @@ const enterprises: Enterprise[] = [
       { label: 'Bank statement coverage', value: '9 months', status: 'partial' },
     ],
     reasons: [
-      {
-        factor: 'Seasonality stress',
-        impact: -7,
-        text: 'Cash receipts dip sharply outside procurement windows.',
-      },
-      {
-        factor: 'GST-bank reconciliation',
-        impact: 10,
-        text: 'Declared turnover reconciles with deposits inside tolerance.',
-      },
-      {
-        factor: 'Invoice concentration',
-        impact: -12,
-        text: 'The swarm recommends invoice-level collateral routing.',
-      },
+      { factor: 'Seasonality stress', impact: -7, text: 'Cash receipts dip sharply outside procurement windows.' },
+      { factor: 'GST-bank reconciliation', impact: 10, text: 'Declared turnover reconciles with deposits inside tolerance.' },
+      { factor: 'Invoice concentration', impact: -12, text: 'The swarm recommends invoice-level collateral routing.' },
     ],
     cashflow: [42, 48, 63, 74, 88, 81, 59, 53, 61, 66, 72, 78],
   },
 ]
 
-const swarmAgents = [
+const fallbackAgents = [
   {
     name: 'Perceiver',
     role: 'AA, GST, UPI, EPFO ingestion',
@@ -288,29 +199,58 @@ const swarmAgents = [
   },
 ]
 
-const events = [
+const fallbackEvents = [
   'AA consent token issued for GST, bank, EPFO, and UPI sources',
   'Perceiver mapped 214 features with 96% schema confidence',
   'Planner selected working-capital path with buyer cap',
   'Guardian signed decision with HMAC audit seal',
 ]
 
-const federatedRounds = [
+const fallbackFederatedRounds = [
   { bank: 'IDBI sandbox', auc: '0.86', drift: 'low', samples: '18.2k' },
   { bank: 'NBFC partner A', auc: '0.83', drift: 'medium', samples: '11.7k' },
   { bank: 'Co-op bank node', auc: '0.81', drift: 'medium', samples: '7.4k' },
 ]
 
 const navItems = [
-  { key: 'health', label: 'Health Card', icon: Gauge },
-  { key: 'swarm', label: 'Swarm', icon: Network },
-  { key: 'explain', label: 'Explainability', icon: Eye },
-  { key: 'security', label: 'Guardian', icon: LockKeyhole },
-  { key: 'federated', label: 'Federated', icon: Landmark },
-  { key: 'architecture', label: 'Architecture', icon: DatabaseZap },
-  { key: 'api', label: 'API', icon: Activity },
-  { key: 'integrations', label: 'Integrations', icon: Zap },
-] as const
+  { label: 'Overview', href: '#overview' },
+  { label: 'Health', href: '#health-card' },
+  { label: 'Workflow', href: '#workflow' },
+  { label: 'Guardian', href: '#guardian' },
+  { label: 'Integrations', href: '#integrations' },
+  { label: 'API', href: '#api' },
+]
+
+const subdomainLinks = [
+  { label: 'app.nemesis', href: '#overview' },
+  { label: 'score.nemesis', href: '#health-card' },
+  { label: 'agents.nemesis', href: '#workflow' },
+  { label: 'guardian.nemesis', href: '#guardian' },
+  { label: 'api.nemesis', href: '#api' },
+]
+
+const consoleWords = [
+  'GST GRAPH',
+  'UPI FLOW',
+  'AI MEMO',
+  'GUARDIAN',
+  'RISK BAND',
+  'TABPFN',
+  'CASHFLOW',
+  'CONSENT',
+  'OCEN',
+  'HMAC',
+  'SWARM',
+  'QDRANT',
+]
+
+const endpoints = [
+  ['GET', '/api/v1/health-card', 'score, reason codes, connectors, audit'],
+  ['POST', '/api/v1/scenario/run', 'baseline, thin-data, stress, attack'],
+  ['GET', '/api/v1/integrations/summary', 'Groq, Firecrawl, OPA, monitoring'],
+  ['GET', '/api/v1/connectors/snapshot', 'AA, GSTN, UPI, EPFO, OCEN, ULI'],
+  ['GET', '/metrics', 'Prometheus-ready service metrics'],
+]
 
 function scenarioOffset(scenario: Scenario) {
   if (scenario === 'thinData') return -7
@@ -330,8 +270,8 @@ function clampScore(value: number) {
 }
 
 function Sparkline({ points }: { points: number[] }) {
-  const width = 260
-  const height = 86
+  const width = 320
+  const height = 110
   const min = Math.min(...points) - 8
   const max = Math.max(...points) + 8
   const coords = points.map((point, index) => {
@@ -347,24 +287,24 @@ function Sparkline({ points }: { points: number[] }) {
       {points.map((point, index) => {
         const x = (index / (points.length - 1)) * width
         const y = height - ((point - min) / (max - min)) * height
-        return <circle key={`${point}-${index}`} cx={x} cy={y} r="3" />
+        return <circle key={`${point}-${index}`} cx={x} cy={y} r="3.5" />
       })}
     </svg>
   )
 }
 
 function Radar({ dimensions }: { dimensions: Dimension[] }) {
-  const size = 260
+  const size = 300
   const center = size / 2
-  const radius = 98
+  const radius = 108
   const points = dimensions.map((dimension, index) => {
     const angle = (Math.PI * 2 * index) / dimensions.length - Math.PI / 2
     const distance = (dimension.value / 100) * radius
     return {
       x: center + Math.cos(angle) * distance,
       y: center + Math.sin(angle) * distance,
-      labelX: center + Math.cos(angle) * (radius + 24),
-      labelY: center + Math.sin(angle) * (radius + 24),
+      labelX: center + Math.cos(angle) * (radius + 28),
+      labelY: center + Math.sin(angle) * (radius + 28),
       short: dimension.label
         .split(' ')
         .map((word) => word[0])
@@ -374,7 +314,7 @@ function Radar({ dimensions }: { dimensions: Dimension[] }) {
 
   return (
     <svg className="radar" viewBox={`0 0 ${size} ${size}`} role="img">
-      <title>Six dimension MSME score radar</title>
+      <title>Six-dimension MSME score radar</title>
       {[0.25, 0.5, 0.75, 1].map((scale) => (
         <polygon
           key={scale}
@@ -390,14 +330,7 @@ function Radar({ dimensions }: { dimensions: Dimension[] }) {
         />
       ))}
       {points.map((point, index) => (
-        <line
-          key={`axis-${index}`}
-          className="radar-axis"
-          x1={center}
-          y1={center}
-          x2={point.labelX}
-          y2={point.labelY}
-        />
+        <line key={`axis-${index}`} className="radar-axis" x1={center} y1={center} x2={point.labelX} y2={point.labelY} />
       ))}
       <polygon className="radar-score" points={points.map((point) => `${point.x},${point.y}`).join(' ')} />
       {points.map((point, index) => (
@@ -409,9 +342,8 @@ function Radar({ dimensions }: { dimensions: Dimension[] }) {
   )
 }
 
-function App() {
+function App({ onHome }: { onHome?: () => void } = {}) {
   const [selectedId, setSelectedId] = useState(enterprises[0].id)
-  const [activeTab, setActiveTab] = useState<(typeof navItems)[number]['key']>('health')
   const [scenario, setScenario] = useState<Scenario>('baseline')
   const [runCount, setRunCount] = useState(1)
   const [apiCard, setApiCard] = useState<BackendHealthCard | null>(null)
@@ -421,7 +353,6 @@ function App() {
   useEffect(() => {
     let cancelled = false
     setApiStatus('connecting')
-
     fetchHealthCard(selectedId, scenario)
       .then((card: BackendHealthCard) => {
         if (!cancelled) {
@@ -435,7 +366,6 @@ function App() {
           setApiStatus('fallback')
         }
       })
-
     return () => {
       cancelled = true
     }
@@ -443,7 +373,6 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
-
     fetchIntegrationSummary(selectedId, scenario)
       .then((summary: IntegrationSummary) => {
         if (!cancelled) {
@@ -455,7 +384,6 @@ function App() {
           setIntegrationSummary(null)
         }
       })
-
     return () => {
       cancelled = true
     }
@@ -481,14 +409,6 @@ function App() {
     [apiCard, enterprise, scenario],
   )
 
-  const guardianVerdict =
-    apiCard?.guardian.verdict ??
-    (scenario === 'attack'
-      ? 'Blocked prompt injection and spoofed planner identity'
-      : scenario === 'stress'
-        ? 'Warned: exposure cap and collateral routing required'
-        : 'Approved with signed audit seal')
-
   const scenarioLabel =
     apiCard?.scenario.label ??
     (scenario === 'baseline'
@@ -499,81 +419,100 @@ function App() {
           ? 'Stress test'
           : 'Attack sim')
 
-  const renderedAgents = (apiCard?.swarm_agents ?? swarmAgents).map((agent) => {
-    const staticAgent = swarmAgents.find((item) => item.name === agent.name)
+  const renderedAgents = (apiCard?.swarm_agents ?? fallbackAgents).map((agent) => {
+    const staticAgent = fallbackAgents.find((item) => item.name === agent.name)
     return { ...agent, icon: staticAgent?.icon ?? Network }
   })
-  const renderedEvents = apiCard?.events ?? events
-  const renderedFederatedRounds = apiCard?.federated_rounds ?? federatedRounds
+  const renderedEvents = apiCard?.events ?? fallbackEvents
+  const renderedFederatedRounds = apiCard?.federated_rounds ?? fallbackFederatedRounds
+  const guardianFinding =
+    apiCard?.guardian.findings[0]?.message ??
+    (scenario === 'attack'
+      ? 'Unsafe override attempt blocked and signed into audit.'
+      : 'Consent, explainability, and threshold gates are active.')
+  const memo = integrationSummary?.credit_memo.memo
+  const catalog = integrationSummary?.catalog ?? []
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar" aria-label="Nemesis navigation">
-        <div className="brand-block">
-          <div className="brand-mark">
-            <LineChart size={24} />
-          </div>
-          <div>
-            <p className="eyebrow">IDBI Innovate Track 03</p>
-            <h1>Nemesis</h1>
-          </div>
-        </div>
-
-        <nav className="nav-list">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                key={item.key}
-                className={activeTab === item.key ? 'nav-item active' : 'nav-item'}
-                type="button"
-                onClick={() => setActiveTab(item.key)}
-                title={item.label}
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-              </button>
-            )
-          })}
+    <main className="tesla-site">
+      <div className="console-aurora" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="console-word-field" aria-hidden="true">
+        {consoleWords.map((word) => (
+          <span key={word}>{word}</span>
+        ))}
+      </div>
+      <header className="site-header">
+        <a className="brand-link" href="#overview" aria-label="Nemesis home">
+          <LineChart size={22} />
+          <span>Nemesis</span>
+        </a>
+        <nav className="desktop-nav" aria-label="Site sections">
+          {navItems.map((item) => (
+            <a key={item.href} href={item.href}>
+              {item.label}
+            </a>
+          ))}
         </nav>
+        <div className="header-right">
+          {onHome && (
+            <button type="button" className="header-home" onClick={onHome}>
+              <ArrowLeft size={16} />
+              Back
+            </button>
+          )}
+          <a className="header-action" href="#api">
+            {apiStatus === 'live' ? 'Live API' : apiStatus === 'connecting' ? 'Connecting' : 'Demo Mode'}
+          </a>
+        </div>
+      </header>
 
-        <div className="sidebar-panel">
-          <p className="eyebrow">Live decision clock</p>
-          <div className="metric-row">
-            <DatabaseZap size={18} />
-            <strong>{apiStatus === 'live' ? 'API' : apiStatus === 'connecting' ? '...' : 'UI'}</strong>
-            <span>{apiStatus === 'live' ? 'live backend' : apiStatus === 'connecting' ? 'connecting' : 'static fallback'}</span>
+      <section id="overview" className="snap-section hero-section">
+        <div className="hero-shade" />
+        <div className="hero-copy">
+          <p className="section-kicker">IDBI Innovate 2026</p>
+          <h1>Nemesis</h1>
+          <p className="hero-subtitle">
+            MSME Financial Health Card, AI credit memo, Guardian audit, and integration-ready underwriting in one
+            full-stack prototype.
+          </p>
+          <div className="hero-meta">
+            <span>Score {activeScore}/100</span>
+            <span>{scenarioLabel}</span>
+            <span>{enterprise.name}</span>
           </div>
-          <div className="metric-row">
-            <Clock3 size={18} />
-            <strong>00:48</strong>
-            <span>to score</span>
-          </div>
-          <div className="metric-row">
-            <Zap size={18} />
-            <strong>{runCount}</strong>
-            <span>scoring runs</span>
+          <div className="subdomain-strip" aria-label="Nemesis product subdomains">
+            {subdomainLinks.map((item) => (
+              <a key={item.href} href={item.href}>
+                {item.label}
+              </a>
+            ))}
           </div>
         </div>
-      </aside>
 
-      <section className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">MSME financial health swarm</p>
-            <h2>Enterprise mirror for creditworthiness, consent, and explainability</h2>
+        <div className="hero-console">
+          <div className={`score-ring ${activeTone}`}>
+            <span>Health Score</span>
+            <strong>{activeScore}</strong>
+            <small>{enterprise.decision}</small>
           </div>
-          <div className="topbar-actions">
-            <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} aria-label="Enterprise">
-              {enterprises.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+          <div className="hero-controls">
+            <label>
+              Enterprise
+              <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} aria-label="Enterprise">
+                {enterprises.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
-              className="primary-button"
               onClick={() => {
                 setRunCount((count) => count + 1)
                 setScenario((value) =>
@@ -591,562 +530,224 @@ function App() {
               Run scenario
             </button>
           </div>
-        </header>
+        </div>
 
-        <section className="summary-grid" aria-label="Nemesis summary">
-          <article className={`score-card ${activeTone}`}>
-            <div>
-              <p className="eyebrow">Composite health score</p>
-              <strong>{activeScore}</strong>
-            </div>
-            <span>{enterprise.decision}</span>
-          </article>
-          <article>
-            <Building2 size={22} />
-            <div>
-              <p className="eyebrow">Enterprise</p>
-              <strong>{enterprise.name}</strong>
-              <span>{enterprise.sector}</span>
-            </div>
-          </article>
-          <article>
-            <Banknote size={22} />
-            <div>
-              <p className="eyebrow">Request</p>
-              <strong>{enterprise.ask}</strong>
-              <span>{enterprise.location}</span>
-            </div>
-          </article>
-          <article>
-            <ShieldCheck size={22} />
-            <div>
-              <p className="eyebrow">Guardian verdict</p>
-              <strong>{scenarioLabel}</strong>
-              <span>{guardianVerdict}</span>
-            </div>
-          </article>
-        </section>
+        <a className="scroll-cue" href="#health-card" aria-label="Scroll to Health Card">
+          <ArrowDown size={26} />
+        </a>
+      </section>
 
-        {activeTab === 'health' && (
-          <section className="content-grid two-column">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Financial Health Card</p>
-                  <h3>Six-dimensional score</h3>
-                </div>
-                <Gauge size={22} />
-              </div>
-              <div className="radar-layout">
-                <Radar dimensions={adjustedDimensions} />
-                <div className="dimension-list">
-                  {adjustedDimensions.map((dimension) => (
-                    <div key={dimension.label} className="dimension-row">
-                      <div>
-                        <strong>{dimension.label}</strong>
-                        <span>{dimension.signal}</span>
-                      </div>
-                      <b className={scoreTone(dimension.value)}>{dimension.value}</b>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </article>
+      <section id="health-card" className="snap-section product-section health-section">
+        <div className="section-copy">
+          <p className="section-kicker">Financial Health Card</p>
+          <h2>Six dimensions. One explainable score.</h2>
+          <p>
+            Nemesis turns alternate data into a clear scorecard for IDBI teams and borrower-facing improvement
+            guidance for MSMEs.
+          </p>
+          <div className="quick-stats">
+            <span>
+              <Building2 size={18} />
+              {enterprise.sector}
+            </span>
+            <span>
+              <Banknote size={18} />
+              {enterprise.ask}
+            </span>
+            <span>
+              <ShieldCheck size={18} />
+              {apiCard?.guardian.verdict ?? 'APPROVED'}
+            </span>
+          </div>
+        </div>
 
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Cashflow signal</p>
-                  <h3>Alternate-data trend</h3>
-                </div>
-                <Activity size={22} />
+        <div className="glass-panel health-panel">
+          <Radar dimensions={adjustedDimensions} />
+          <div className="health-data-stack">
+            <div className="cashflow-strip">
+              <div>
+                <strong>Cashflow signal</strong>
+                <span>Alternate-data monthly trend</span>
               </div>
               <Sparkline points={enterprise.cashflow.map((value) => clampScore(value + scenarioOffset(scenario)))} />
-              <div className="feature-grid">
-                {enterprise.features.map((feature) => (
-                  <div key={feature.label} className="feature-tile">
-                    <span>{feature.label}</span>
-                    <strong>{feature.value}</strong>
-                    <small>{feature.status}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'swarm' && (
-          <section className="content-grid">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Eraya-inspired cascade</p>
-                  <h3>Four-agent financial swarm</h3>
-                </div>
-                <Network size={22} />
-              </div>
-              <div className="agent-grid">
-                {renderedAgents.map((agent) => {
-                  const Icon = agent.icon
-                  return (
-                    <div key={agent.name} className="agent-tile">
-                      <div className="agent-icon">
-                        <Icon size={22} />
-                      </div>
-                      <div>
-                        <strong>{agent.name}</strong>
-                        <span>{agent.role}</span>
-                        <p>{agent.detail}</p>
-                      </div>
-                      <div className="health-bar" aria-label={`${agent.name} health ${agent.health}`}>
-                        <i style={{ width: `${agent.health}%` }} />
-                      </div>
-                      <small>{agent.tier}</small>
-                    </div>
-                  )
-                })}
-              </div>
-            </article>
-
-            <article className="panel compact-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">A2A event stream</p>
-                  <h3>Decision path</h3>
-                </div>
-                <GitBranch size={22} />
-              </div>
-              <ol className="event-list">
-                {renderedEvents.map((event, index) => (
-                  <li key={event}>
-                    <span>{index + 1}</span>
-                    <p>{event}</p>
-                  </li>
-                ))}
-              </ol>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'explain' && (
-          <section className="content-grid two-column">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Reason codes</p>
-                  <h3>SHAP-grade explanation layer</h3>
-                </div>
-                <Eye size={22} />
-              </div>
-              <div className="reason-list">
-                {enterprise.reasons.map((reason) => (
-                  <div key={reason.factor} className="reason-row">
-                    <div>
-                      <strong>{reason.factor}</strong>
-                      <p>{reason.text}</p>
-                    </div>
-                    <b className={reason.impact > 0 ? 'good' : 'risk'}>
-                      {reason.impact > 0 ? '+' : ''}
-                      {reason.impact}
-                    </b>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Counterfactual monitor</p>
-                  <h3>Digital-twin stress response</h3>
-                </div>
-                <LineChart size={22} />
-              </div>
-              <div className="stress-grid">
-                {[
-                  ['GST delay 2 months', '-9 score', 'watch'],
-                  ['Top buyer payment late', '-14 score', 'risk'],
-                  ['UPI inflow +12%', '+6 score', 'good'],
-                  ['EPFO drop 20%', '-5 score', 'watch'],
-                ].map(([label, value, tone]) => (
-                  <div key={label} className={`stress-tile ${tone}`}>
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'security' && (
-          <section className="content-grid two-column">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Guardian controls</p>
-                  <h3>Policy, consent, and tamper evidence</h3>
-                </div>
-                <LockKeyhole size={22} />
-              </div>
-              <div className="control-list">
-                {[
-                  ['Consent scope verified', 'AA token bound to GST, bank, UPI, EPFO only', CheckCircle2],
-                  ['RBI XAI coverage', 'Every decision emits human-readable reason codes', FileCheck2],
-                  ['Injection sentinel', 'Operator text and model rationale scanned before use', AlertTriangle],
-                  ['Audit signer', 'Decision envelope sealed with HMAC-SHA256', ShieldCheck],
-                ].map(([label, detail, Icon]) => {
-                  const ControlIcon = Icon as typeof CheckCircle2
-                  return (
-                    <div key={label as string} className="control-row">
-                      <ControlIcon size={20} />
-                      <div>
-                        <strong>{label as string}</strong>
-                        <span>{detail as string}</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </article>
-
-            <article className="panel alert-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Attack console</p>
-                  <h3>{scenario === 'attack' ? 'Blocked' : 'Ready'}</h3>
-                </div>
-                <ShieldCheck size={22} />
-              </div>
-              <p className="audit-copy">
-                {apiCard?.guardian.findings[0]?.message ??
-                  (scenario === 'attack'
-                  ? 'A spoofed planner attempted to override exposure caps. Guardian rejected the message, quarantined the action path, and issued a signed audit record.'
-                  : 'Guardian is monitoring consent drift, prompt injection, high-risk exposure, and incomplete-data overrides.')}
-              </p>
-              <div className="audit-seal">
-                <span>Audit seal</span>
-                <strong>{apiCard?.guardian.signature_preview ?? `nemesis-${runCount.toString().padStart(4, '0')}-a9f3c1`}</strong>
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'federated' && (
-          <section className="content-grid">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Federated-learning core</p>
-                  <h3>Model travels, raw data stays local</h3>
-                </div>
-                <Landmark size={22} />
-              </div>
-              <div className="federated-table">
-                <div className="table-head">
-                  <span>Node</span>
-                  <span>AUROC</span>
-                  <span>Drift</span>
-                  <span>Samples</span>
-                </div>
-                {renderedFederatedRounds.map((round) => (
-                  <div key={round.bank} className="table-row">
-                    <strong>{round.bank}</strong>
-                    <span>{round.auc}</span>
-                    <span>{round.drift}</span>
-                    <span>{round.samples}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="panel compact-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Deployment surface</p>
-                  <h3>Connectors</h3>
-                </div>
-                <DatabaseZap size={22} />
-              </div>
-              <div className="connector-list">
-                {['AA consent', 'GSTN', 'NPCI UPI', 'EPFO', 'OCEN', 'ULI'].map((connector) => (
-                  <span key={connector}>{connector}</span>
-                ))}
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'architecture' && (
-          <section className="content-grid">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">System architecture</p>
-                  <h3>Consent to health-card workflow</h3>
-                </div>
-                <DatabaseZap size={22} />
-              </div>
-              <div className="architecture-flow">
-                {(apiCard?.architecture_nodes ?? [
-                  {
-                    layer: 'L1',
-                    name: 'Consent and source connectors',
-                    components: ['AA', 'GSTN', 'NPCI UPI', 'EPFO', 'Bank parser'],
-                    status: 'mocked in backend',
-                  },
-                  {
-                    layer: 'L2',
-                    name: 'Feature engineering',
-                    components: ['cashflow', 'compliance', 'concentration', 'working capital'],
-                    status: 'deterministic prototype',
-                  },
-                  {
-                    layer: 'L3',
-                    name: 'Swarm and scoring',
-                    components: ['Perceiver', 'Planner', 'Guardian', 'Recoverer'],
-                    status: 'orchestrated scoring pipeline',
-                  },
-                  {
-                    layer: 'L4',
-                    name: 'Delivery and lending rails',
-                    components: ['Health Card UI', 'OCEN', 'ULI', 'LOS handoff'],
-                    status: 'API-ready stubs',
-                  },
-                ]).map((node) => (
-                  <div key={node.layer} className="architecture-node">
-                    <b>{node.layer}</b>
-                    <div>
-                      <strong>{node.name}</strong>
-                      <span>{node.components.join(' / ')}</span>
-                      <small>{node.status}</small>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="panel compact-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Benchmark</p>
-                  <h3>Decision readiness</h3>
-                </div>
-                <Activity size={22} />
-              </div>
-              <div className="benchmark-list">
-                <div>
-                  <span>Indicative decision</span>
-                  <strong>
-                    {apiCard ? `${Math.round(apiCard.benchmark.indicative_decision_ms / 1000)}s` : '<90s'}
-                  </strong>
-                </div>
-                <div>
-                  <span>Model confidence</span>
-                  <strong>{apiCard ? `${Math.round(apiCard.benchmark.model_confidence * 100)}%` : '86%'}</strong>
-                </div>
-                <div>
-                  <span>Reason coverage</span>
-                  <strong>{apiCard?.benchmark.reason_code_coverage ?? '100%'}</strong>
-                </div>
-                <div>
-                  <span>Cascade tier</span>
-                  <strong>{apiCard?.benchmark.tier_used ?? 'tier2_tabular'}</strong>
-                </div>
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'api' && (
-          <section className="content-grid two-column">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Backend API</p>
-                  <h3>Runnable endpoints</h3>
-                </div>
-                <DatabaseZap size={22} />
-              </div>
-              <div className="endpoint-list">
-                {[
-                  ['GET', '/api/v1/health-card', 'Generate score, reason codes, connector snapshot, and Guardian audit'],
-                  ['POST', '/api/v1/scenario/run', 'Run baseline, thinData, stress, or attack simulation'],
-                  ['GET', '/api/v1/connectors/snapshot', 'Inspect AA, GST, UPI, EPFO, OCEN, and ULI payloads'],
-                  ['GET', '/api/v1/audit/latest', 'Return latest signed Guardian decision envelope'],
-                  ['GET', '/api/v1/federated/status', 'Show multi-node model-readiness status'],
-                ].map(([method, path, detail]) => (
-                  <div key={path} className="endpoint-row">
-                    <b>{method}</b>
-                    <div>
-                      <strong>{path}</strong>
-                      <span>{detail}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Connector status</p>
-                  <h3>{apiStatus === 'live' ? 'Live snapshot' : 'Fallback preview'}</h3>
-                </div>
-                <CheckCircle2 size={22} />
-              </div>
-              <div className="connector-health">
-                {[
-                  ['AA consent', apiCard?.connectors.account_aggregator ? 'active' : 'ready'],
-                  ['GSTN', apiCard?.connectors.gst ? 'available' : 'mock'],
-                  ['NPCI UPI', apiCard?.connectors.upi ? 'available' : 'mock'],
-                  ['EPFO', apiCard?.connectors.epfo ? 'scoped' : 'mock'],
-                  ['OCEN', apiCard?.connectors.ocen ? 'payload ready' : 'stub'],
-                  ['ULI', apiCard?.connectors.uli ? 'payload ready' : 'stub'],
-                ].map(([name, status]) => (
-                  <div key={name} className="connector-health-row">
-                    <strong>{name}</strong>
-                    <span>{status}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-        )}
-
-        {activeTab === 'integrations' && (
-          <section className="content-grid two-column">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">AI credit officer</p>
-                  <h3>{integrationSummary?.credit_memo.tool ?? 'Groq AI'} memo pipeline</h3>
-                </div>
-                <Zap size={22} />
-              </div>
-              <div className="memo-panel">
-                <span className="mode-pill">{integrationSummary?.credit_memo.mode ?? 'fallback'}</span>
-                <strong>
-                  {integrationSummary?.credit_memo.memo.summary ??
-                    `${enterprise.name} has a policy-checked score and is ready for credit memo generation.`}
-                </strong>
-                <div className="memo-columns">
+            </div>
+            <div className="dimension-list">
+              {adjustedDimensions.map((dimension) => (
+                <div key={dimension.label} className="dimension-row">
                   <div>
-                    <span>Mitigants</span>
-                    {(integrationSummary?.credit_memo.memo.mitigants ?? [
-                      'Cap exposure until buyer concentration improves.',
-                      'Monitor monthly GST-bank reconciliation.',
-                    ]).map((item: string) => (
-                      <p key={item}>{item}</p>
-                    ))}
+                    <strong>{dimension.label}</strong>
+                    <span>{dimension.signal}</span>
                   </div>
-                  <div>
-                    <span>Borrower advice</span>
-                    {(integrationSummary?.credit_memo.memo.borrower_advice ?? [
-                      'Improve receivable cycles.',
-                      'Grow repeat customers across more buyers.',
-                    ]).map((item: string) => (
-                      <p key={item}>{item}</p>
-                    ))}
-                  </div>
+                  <b className={scoreTone(dimension.value)}>{dimension.value}</b>
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
-              <div className="integration-catalog">
-                {(integrationSummary?.catalog ?? [
-                  {
-                    name: 'Groq AI',
-                    category: 'AI credit officer',
-                    status: 'fallback',
-                    purpose: 'Generate structured credit memo and planner rationale.',
-                  },
-                  {
-                    name: 'Firecrawl',
-                    category: 'External verification',
-                    status: 'fallback',
-                    purpose: 'Verify MSME web footprint and supplier context.',
-                  },
-                  {
-                    name: 'OPA',
-                    category: 'Policy engine',
-                    status: 'local-rules',
-                    purpose: 'Evaluate underwriting policies.',
-                  },
-                ]).map((tool) => (
-                  <div key={tool.name} className="integration-row">
-                    <div>
-                      <strong>{tool.name}</strong>
-                      <span>{tool.category}</span>
-                      <p>{tool.purpose}</p>
-                    </div>
-                    <b>{tool.status}</b>
-                  </div>
-                ))}
-              </div>
-            </article>
+      <section id="workflow" className="snap-section product-section workflow-section">
+        <div className="section-copy centered">
+          <p className="section-kicker">Workflow</p>
+          <h2>Consent to decision, with agents in the loop.</h2>
+          <p>Perceiver maps data, Planner structures credit action, Guardian validates policy, Recoverer handles gaps.</p>
+        </div>
+        <div className="agent-row">
+          {renderedAgents.map((agent) => {
+            const Icon = agent.icon
+            return (
+              <article key={agent.name} className="agent-card">
+                <Icon size={24} />
+                <strong>{agent.name}</strong>
+                <span>{agent.role}</span>
+                <div className="health-bar" aria-label={`${agent.name} health ${agent.health}`}>
+                  <i style={{ width: `${agent.health}%` }} />
+                </div>
+                <small>{agent.tier}</small>
+              </article>
+            )
+          })}
+        </div>
+        <ol className="event-strip">
+          {renderedEvents.map((event, index) => (
+            <li key={event}>
+              <span>{index + 1}</span>
+              <p>{event}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
 
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Ops and verification</p>
-                  <h3>Hackathon readiness stack</h3>
-                </div>
-                <ShieldCheck size={22} />
-              </div>
-              <div className="ops-grid">
-                <div>
-                  <span>Firecrawl verification</span>
-                  <strong>{integrationSummary?.external_verification.mode ?? 'fallback'}</strong>
-                  {(integrationSummary?.external_verification.signals ?? ['External signal fallback is ready.']).map((signal: string) => (
-                    <p key={signal}>{signal}</p>
-                  ))}
-                </div>
-                <div>
-                  <span>OPA policy</span>
-                  <strong>{integrationSummary?.policy.mode ?? 'local-rules'}</strong>
-                  <p>
-                    {integrationSummary?.policy.result.reason ??
-                      `Allow: ${String(integrationSummary?.policy.result.allow ?? activeScore >= 62)}`}
-                  </p>
-                </div>
-                <div>
-                  <span>Evidently monitor</span>
-                  <strong>{integrationSummary?.model_monitor.score_mean ?? activeScore}</strong>
-                  <p>Mean score with confidence {integrationSummary?.model_monitor.confidence_mean ?? '0.86'}</p>
-                </div>
-                <div>
-                  <span>Great Expectations</span>
-                  <strong>
-                    {integrationSummary
-                      ? `${integrationSummary.data_quality.expectations.length} suites`
-                      : 'contracts'}
-                  </strong>
-                  <p>Connector quality gates for GST, UPI, EPFO, and bank data.</p>
-                </div>
-                <div>
-                  <span>Doc intelligence</span>
-                  <strong>{integrationSummary?.document_intelligence.supported_docs.length ?? 4} docs</strong>
-                  <p>Invoice, statement, GST, and purchase-order parsing contract.</p>
-                </div>
-                <div>
-                  <span>Vector memory</span>
-                  <strong>{typeof integrationSummary?.memory.qdrant_status === 'string' ? integrationSummary.memory.qdrant_status : 'online'}</strong>
-                  <p>{(integrationSummary?.memory.collections ?? ['credit_memos', 'policy_docs']).join(', ')}</p>
-                </div>
-                <div>
-                  <span>Observability</span>
-                  <strong>{integrationSummary?.operations.observability.tool ?? 'OpenTelemetry'}</strong>
-                  <p>{(integrationSummary?.operations.observability.metrics ?? ['score_runs', 'guardian_blocks']).slice(0, 2).join(', ')}</p>
-                </div>
-                <div>
-                  <span>Storage / workspace</span>
-                  <strong>{integrationSummary?.operations.storage.tool ?? 'MinIO'} + Zerve</strong>
-                  <p>Health-card exports, docs, notebooks, and validation workflows.</p>
-                </div>
-              </div>
+      <section id="guardian" className="snap-section split-section guardian-section">
+        <div className="section-copy">
+          <p className="section-kicker">Guardian + AI Credit Officer</p>
+          <h2>Fast decisions, checked before they move.</h2>
+          <p>{guardianFinding}</p>
+          <div className="audit-seal">
+            <span>Audit Seal</span>
+            <strong>{apiCard?.guardian.signature_preview ?? `nemesis-${runCount.toString().padStart(4, '0')}-a9f3c1`}</strong>
+          </div>
+        </div>
+
+        <div className="glass-panel memo-card">
+          <span className="mode-pill">{integrationSummary?.credit_memo.mode ?? 'fallback'}</span>
+          <h3>{memo?.summary ?? `${enterprise.name} is ready for a policy-checked AI credit memo.`}</h3>
+          <div className="memo-columns">
+            <div>
+              <strong>Mitigants</strong>
+              {(memo?.mitigants ?? ['Cap exposure until buyer concentration improves.', 'Monitor GST-bank reconciliation monthly.']).map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+            <div>
+              <strong>Borrower Advice</strong>
+              {(memo?.borrower_advice ?? ['Shorten receivable cycles.', 'Grow repeat customers across more buyers.']).map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="integrations" className="snap-section product-section integrations-section">
+        <div className="section-copy centered">
+          <p className="section-kicker">Advanced Integrations</p>
+          <h2>AI, verification, policy, storage, memory, and observability.</h2>
+          <p>
+            All adapters are demo-safe: live when keys or services exist, deterministic fallback when they do not.
+          </p>
+        </div>
+
+        <div className="integration-grid">
+          {(catalog.length ? catalog : [
+            { name: 'Groq AI', category: 'AI credit officer', status: 'fallback', purpose: 'Structured credit memo and planner rationale.' },
+            { name: 'Firecrawl', category: 'External verification', status: 'fallback', purpose: 'MSME web footprint and supplier context.' },
+            { name: 'OPA', category: 'Policy engine', status: 'local-rules', purpose: 'External Rego-ready underwriting gates.' },
+            { name: 'Tinybird', category: 'Real-time analytics', status: 'fallback', purpose: 'Score runs and Guardian event stream.' },
+            { name: 'Qdrant / Chroma', category: 'Vector memory', status: 'docker-ready', purpose: 'Credit memo and policy document memory.' },
+            { name: 'MinIO + Grafana', category: 'Operations', status: 'docker-ready', purpose: 'Storage, metrics, traces, and dashboards.' },
+          ]).slice(0, 8).map((tool) => (
+            <article key={tool.name} className="integration-card">
+              <strong>{tool.name}</strong>
+              <span>{tool.category}</span>
+              <p>{tool.purpose}</p>
+              <b>{tool.status}</b>
             </article>
-          </section>
-        )}
+          ))}
+        </div>
+      </section>
+
+      <section id="api" className="snap-section split-section api-section">
+        <div className="section-copy">
+          <p className="section-kicker">Directories + API</p>
+          <h2>Every major surface has a direct path.</h2>
+          <p>
+            The site now behaves like a product showcase with direct section links, while the backend exposes runnable
+            endpoints for scoring, policy, integrations, and metrics.
+          </p>
+          <div className="directory-map">
+            {navItems.map((item) => (
+              <a key={item.href} href={item.href}>
+                {item.href}
+              </a>
+            ))}
+            {subdomainLinks.map((item) => (
+              <a key={item.label} href={item.href}>
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div className="glass-panel api-panel">
+          {endpoints.map(([method, path, detail]) => (
+            <div key={path} className="endpoint-row">
+              <b>{method}</b>
+              <div>
+                <strong>{path}</strong>
+                <span>{detail}</span>
+              </div>
+            </div>
+          ))}
+          <div className="benchmark-row">
+            <span>
+              <Gauge size={18} />
+              {apiCard ? `${Math.round(apiCard.benchmark.model_confidence * 100)}% confidence` : '86% confidence'}
+            </span>
+            <span>
+              <Activity size={18} />
+              {apiCard?.benchmark.tier_used ?? 'tier2_tabular'}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="snap-section product-section closing-section">
+        <div className="section-copy centered">
+          <p className="section-kicker">Deployment Ready</p>
+          <h2>Built for a live hackathon walkthrough.</h2>
+          <p>Frontend, FastAPI backend, Docker Compose stack, policy files, metrics, and slide draft are in the repo.</p>
+        </div>
+        <div className="federated-table glass-panel">
+          <div className="table-head">
+            <span>Node</span>
+            <span>AUROC</span>
+            <span>Drift</span>
+            <span>Samples</span>
+          </div>
+          {renderedFederatedRounds.map((round) => (
+            <div key={round.bank} className="table-row">
+              <strong>{round.bank}</strong>
+              <span>{round.auc}</span>
+              <span>{round.drift}</span>
+              <span>{round.samples}</span>
+            </div>
+          ))}
+        </div>
+        <footer className="site-footer">
+          <span>Nemesis IDBI Hackathon</span>
+          <span>React + FastAPI + Guardian + Integrations</span>
+        </footer>
       </section>
     </main>
   )

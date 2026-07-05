@@ -4,6 +4,7 @@ import json
 import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -17,15 +18,23 @@ def _configured(*names: str) -> bool:
     return all(bool(os.getenv(name)) for name in names)
 
 
+# Some API edges (e.g. Groq's) reject urllib's default Python User-Agent with 403.
+_USER_AGENT = "nemesis-prototype/1.0"
+
+
 def _post_json(url: str, headers: dict[str, str], payload: dict, timeout: int = 8) -> dict:
     body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    request = urllib.request.Request(
+        url, data=body, headers={"User-Agent": _USER_AGENT, **headers}, method="POST"
+    )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _get_json(url: str, headers: dict[str, str] | None = None, timeout: int = 2) -> dict:
-    request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    request = urllib.request.Request(
+        url, headers={"User-Agent": _USER_AGENT, **(headers or {})}, method="GET"
+    )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -68,11 +77,39 @@ def integration_catalog() -> list[dict]:
             "purpose": "Verify MSME website footprint, public supplier/customer signals, and industry context.",
         },
         {
-            "name": "Tinybird",
-            "category": "Real-time analytics",
-            "status": "live-ready" if _configured("TINYBIRD_TOKEN", "TINYBIRD_EVENTS_URL") else "fallback",
-            "env": ["TINYBIRD_TOKEN", "TINYBIRD_EVENTS_URL"],
-            "purpose": "Stream scoring runs, Guardian blocks, connector health, and conversion metrics.",
+            "name": "TinyFish",
+            "category": "Agentic web intelligence",
+            "status": "live-ready" if _configured("TINYFISH_API_KEY") else "fallback",
+            "env": ["TINYFISH_API_KEY", "TINYFISH_EVENTS_URL"],
+            "purpose": "Run web agents for MSME footprint checks and stream scoring/Guardian events.",
+        },
+        {
+            "name": "Sarvam AI",
+            "category": "Vernacular AI",
+            "status": "live-ready" if _configured("SARVAM_API_KEY") else "fallback",
+            "env": ["SARVAM_API_KEY"],
+            "purpose": "Deliver credit-officer answers and borrower advice in Indian languages, voice-ready.",
+        },
+        {
+            "name": "Pinecone",
+            "category": "Vector memory (managed)",
+            "status": "live-ready" if _configured("PINECONE_API_KEY") else "fallback",
+            "env": ["PINECONE_API_KEY"],
+            "purpose": "Managed vector index for credit memos, policy docs, and decision templates.",
+        },
+        {
+            "name": "Zerve AI",
+            "category": "Data-science workspace",
+            "status": "live-ready" if _configured("ZERVE_API_KEY") else "fallback",
+            "env": ["ZERVE_API_KEY", "ZERVE_WORKSPACE_URL"],
+            "purpose": "Host feature experiments, scorecard reviews, and model validation workflows.",
+        },
+        {
+            "name": "Pexels",
+            "category": "Media enrichment",
+            "status": "live-ready" if _configured("PEXELS_API_KEY") else "fallback",
+            "env": ["PEXELS_API_KEY"],
+            "purpose": "Fetch sector imagery for health cards, reports, and borrower-facing screens.",
         },
         {
             "name": "Open Policy Agent",
@@ -138,13 +175,6 @@ def integration_catalog() -> list[dict]:
             "purpose": "Store uploaded statements, invoices, OCR output, and signed health-card exports.",
         },
         {
-            "name": "Zerve",
-            "category": "Data science workspace",
-            "status": "workflow-ready",
-            "env": ["ZERVE_WORKSPACE_URL"],
-            "purpose": "Host feature-engineering notebooks, score experiments, and reviewer-facing analysis runs.",
-        },
-        {
             "name": "LangGraph",
             "category": "Agent orchestration",
             "status": "design-ready",
@@ -154,6 +184,53 @@ def integration_catalog() -> list[dict]:
     ]
 
 
+def _as_text(value: Any) -> str:
+    """Flatten any JSON value into a readable string."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "; ".join(f"{str(k).replace('_', ' ')}: {_as_text(v)}" for k, v in value.items())
+    if isinstance(value, list):
+        return "; ".join(_as_text(item) for item in value)
+    return str(value)
+
+
+def _as_str_list(value: Any) -> list[str]:
+    """Flatten any JSON value into a list of readable strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [f"{str(k).replace('_', ' ')}: {_as_text(v)}" for k, v in value.items()]
+    if isinstance(value, list):
+        out: list[str] = []
+        for item in value:
+            if isinstance(item, (dict, list)):
+                out.extend(_as_str_list(item))
+            else:
+                out.append(_as_text(item))
+        return out
+    return [str(value)]
+
+
+def _normalize_memo(memo: Any, enterprise: dict) -> dict:
+    """Coerce an arbitrary LLM memo JSON into the strict shape the UI expects."""
+    if not isinstance(memo, dict):
+        memo = {}
+    summary = memo.get("summary")
+    mitigants = _as_str_list(memo.get("mitigants"))[:5]
+    advice = _as_str_list(memo.get("borrower_advice") or memo.get("advice"))[:5]
+    return {
+        "summary": _as_text(summary)
+        if summary is not None
+        else f"{enterprise['name']} scored {enterprise['composite']}/100 with {enterprise['decision'].lower()}.",
+        "decision": _as_text(memo.get("decision", enterprise["decision"])),
+        "mitigants": mitigants or ["Cap exposure until buyer concentration improves."],
+        "borrower_advice": advice or ["Diversify the buyer base and shorten receivable cycles."],
+    }
+
+
 def generate_credit_memo(enterprise_id: str, scenario: str = "baseline") -> dict:
     card = build_health_card(enterprise_id, scenario)
     enterprise = card["enterprise"]
@@ -161,7 +238,10 @@ def generate_credit_memo(enterprise_id: str, scenario: str = "baseline") -> dict
     safe_context = redact_pii(json.dumps(enterprise, ensure_ascii=True))["redacted_text"]
 
     prompt = (
-        "Write a concise MSME credit memo as JSON with keys summary, decision, mitigants, borrower_advice. "
+        "Write a concise MSME credit memo as strict JSON with exactly these keys: "
+        '"summary" (one string sentence), "decision" (one short string), '
+        '"mitigants" (array of short strings), "borrower_advice" (array of short strings). '
+        "Every array element must be a plain string, not an object. "
         f"Use this redacted underwriting context: {safe_context}"
     )
 
@@ -189,7 +269,7 @@ def generate_credit_memo(enterprise_id: str, scenario: str = "baseline") -> dict
                 "tool": "Groq AI",
                 "mode": "live",
                 "model": model,
-                "memo": json.loads(content),
+                "memo": _normalize_memo(json.loads(content), enterprise),
             }
         except (KeyError, json.JSONDecodeError, urllib.error.URLError, TimeoutError, OSError) as exc:
             live_error = str(exc)
@@ -274,23 +354,30 @@ def analytics_event(enterprise_id: str, scenario: str) -> dict:
         "tier_used": card["benchmark"]["tier_used"],
     }
 
-    if _configured("TINYBIRD_TOKEN", "TINYBIRD_EVENTS_URL"):
+    if _configured("TINYFISH_API_KEY", "TINYFISH_EVENTS_URL"):
         try:
             response = _post_json(
-                os.environ["TINYBIRD_EVENTS_URL"],
+                os.environ["TINYFISH_EVENTS_URL"],
                 {
-                    "Authorization": f"Bearer {os.environ['TINYBIRD_TOKEN']}",
+                    "Authorization": f"Bearer {os.environ['TINYFISH_API_KEY']}",
                     "Content-Type": "application/json",
                 },
                 event,
             )
-            return {"tool": "Tinybird", "mode": "live", "event": event, "response": response}
+            return {"tool": "TinyFish", "mode": "live", "event": event, "response": response}
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             live_error = str(exc)
+    elif _configured("TINYFISH_API_KEY"):
+        return {
+            "tool": "TinyFish",
+            "mode": "key-configured",
+            "event": event,
+            "note": "API key detected; set TINYFISH_EVENTS_URL to stream events to a live endpoint.",
+        }
     else:
-        live_error = "TINYBIRD_TOKEN or TINYBIRD_EVENTS_URL not configured"
+        live_error = "TINYFISH_API_KEY not configured"
 
-    return {"tool": "Tinybird", "mode": "fallback", "error": live_error, "event": event}
+    return {"tool": "TinyFish", "mode": "fallback", "error": live_error, "event": event}
 
 
 def opa_policy_check(enterprise_id: str, scenario: str) -> dict:
@@ -400,11 +487,12 @@ def memory_snapshot() -> dict:
             qdrant_status = "offline_or_not_started"
 
     return {
-        "tool": "Qdrant / Chroma vector memory",
+        "tool": "Qdrant / Chroma / Pinecone vector memory",
         "mode": "docker-ready",
         "qdrant_url": qdrant_url or "http://localhost:6333",
         "chroma_url": chroma_url or "http://localhost:8001",
         "qdrant_status": qdrant_status,
+        "pinecone_status": "key-configured" if _configured("PINECONE_API_KEY") else "not_configured",
         "collections": ["credit_memos", "policy_docs", "msme_profiles", "reason_templates"],
     }
 
@@ -427,7 +515,8 @@ def operations_snapshot() -> dict:
             "buckets": ["documents", "health-cards", "audit-exports"],
         },
         "workspace": {
-            "tool": "Zerve",
+            "tool": "Zerve AI",
+            "status": "key-configured" if _configured("ZERVE_API_KEY") else "not_configured",
             "workspace_url": os.getenv("ZERVE_WORKSPACE_URL", "not_configured"),
             "workflows": ["feature_experiment", "scorecard_review", "model_validation_report"],
         },
@@ -437,6 +526,31 @@ def operations_snapshot() -> dict:
             "edges": ["perceiver->planner", "planner->guardian", "guardian->recoverer"],
         },
     }
+
+
+def sector_image(sector: str) -> dict:
+    if _configured("PEXELS_API_KEY"):
+        query = urllib.parse.quote(f"{sector} industry india")
+        try:
+            data = _get_json(
+                f"https://api.pexels.com/v1/search?query={query}&per_page=1&orientation=landscape",
+                {"Authorization": os.environ["PEXELS_API_KEY"]},
+                timeout=6,
+            )
+            photos = data.get("photos") or []
+            if photos:
+                photo = photos[0]
+                return {
+                    "tool": "Pexels",
+                    "mode": "live",
+                    "image_url": photo["src"]["medium"],
+                    "thumb_url": photo["src"]["small"],
+                    "photographer": photo.get("photographer", ""),
+                    "alt": photo.get("alt", sector),
+                }
+        except (KeyError, json.JSONDecodeError, urllib.error.URLError, TimeoutError, OSError):
+            pass
+    return {"tool": "Pexels", "mode": "fallback", "image_url": None, "thumb_url": None}
 
 
 def integration_summary(enterprise_id: str, scenario: str) -> dict:

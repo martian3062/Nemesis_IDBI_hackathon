@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import threading
+from pathlib import Path
+
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+from .env import load_env_file
+
+load_env_file()
 
 from .integrations import (
     analytics_event,
@@ -17,13 +26,20 @@ from .integrations import (
     opa_policy_check,
     operations_snapshot,
     redact_pii,
+    sector_image,
 )
+from .ai_chat import chat_with_credit_officer
 from .pipeline import (
     ARCHITECTURE_NODES,
     FEDERATED_SNAPSHOT,
     build_health_card,
     list_enterprises,
 )
+from .ml_model import get_model, score_enterprise
+from .data import MSME_DATASET
+from .portfolio import build_portfolio
+from .simulation import run_simulation
+from .swarm import run_swarm
 
 
 class ScenarioRequest(BaseModel):
@@ -33,6 +49,33 @@ class ScenarioRequest(BaseModel):
 
 class RedactionRequest(BaseModel):
     text: str = Field(default="Contact owner at owner@example.com or +919876543210")
+
+
+class SimulationOverrides(BaseModel):
+    gst_filing_timeliness: float | None = Field(default=None, ge=0.0, le=1.0)
+    top_buyer_share: float | None = Field(default=None, ge=0.0, le=1.0)
+    upi_monthly_inflow_lakh: float | None = Field(default=None, ge=0.0, le=200.0)
+    emi_delay_count_180d: int | None = Field(default=None, ge=0, le=24)
+    dso_days: int | None = Field(default=None, ge=0, le=180)
+    bank_avg_balance_lakh: float | None = Field(default=None, ge=0.0, le=100.0)
+
+
+class SimulationRequest(BaseModel):
+    enterprise_id: str = Field(default="suryam")
+    scenario: str = Field(default="baseline")
+    overrides: SimulationOverrides = Field(default_factory=SimulationOverrides)
+
+
+class ChatTurn(BaseModel):
+    role: str = Field(default="user")
+    content: str = Field(default="")
+
+
+class ChatRequest(BaseModel):
+    enterprise_id: str = Field(default="suryam")
+    scenario: str = Field(default="baseline")
+    message: str = Field(default="Why did this MSME get this score?", max_length=4000)
+    history: list[ChatTurn] = Field(default_factory=list)
 
 
 app = FastAPI(
@@ -93,6 +136,30 @@ def health_card(enterprise_id: str = "suryam", scenario: str = "baseline") -> di
 @app.post("/api/v1/scenario/run")
 def run_scenario(request: ScenarioRequest) -> dict:
     return build_health_card(request.enterprise_id, request.scenario)
+
+
+@app.post("/api/v1/simulate")
+def simulate(request: SimulationRequest) -> dict:
+    return run_simulation(
+        request.enterprise_id,
+        request.scenario,
+        request.overrides.model_dump(exclude_none=True),
+    )
+
+
+@app.get("/api/v1/portfolio")
+def portfolio(scenario: str = "baseline") -> dict:
+    return build_portfolio(scenario)
+
+
+@app.post("/api/v1/ai/chat")
+def ai_chat(request: ChatRequest) -> dict:
+    return chat_with_credit_officer(
+        request.enterprise_id,
+        request.scenario,
+        request.message,
+        [turn.model_dump() for turn in request.history],
+    )
 
 
 @app.get("/api/v1/architecture")
@@ -175,6 +242,66 @@ def ops_status() -> dict:
     return operations_snapshot()
 
 
+@app.post("/api/v1/swarm/run")
+def swarm_run(request: ScenarioRequest) -> dict:
+    return run_swarm(request.enterprise_id, request.scenario)
+
+
+@app.get("/api/v1/ml/score")
+def ml_score(enterprise_id: str = "suryam") -> dict:
+    record = MSME_DATASET.get(enterprise_id, MSME_DATASET["suryam"])
+    return score_enterprise(record)
+
+
+@app.get("/api/v1/ml/validation")
+def ml_validation() -> dict:
+    return get_model().validation()
+
+
+@app.get("/api/v1/ml/model-card")
+def ml_model_card() -> dict:
+    return get_model().model_card()
+
+
+@app.get("/api/v1/ml/peers")
+def ml_peers(enterprise_id: str = "suryam") -> dict:
+    from .hf_foundation import nearest_peers
+
+    return nearest_peers(enterprise_id)
+
+
+@app.get("/api/v1/media/sector-image")
+def media_sector_image(sector: str = "manufacturing") -> dict:
+    return sector_image(sector)
+
+
 @app.post("/api/v1/privacy/redact")
 def privacy_redact(request: RedactionRequest) -> dict:
     return redact_pii(request.text)
+
+
+# Serve the built React frontend (repo-root dist/) under /nemesis_idbi so a single
+# uvicorn process can host the whole prototype on one port and coexist with other
+# apps on the deployment host. The Vite base path matches this mount point.
+FRONTEND_BASE = "/nemesis_idbi"
+_DIST_DIR = Path(__file__).resolve().parent.parent.parent / "dist"
+if _DIST_DIR.is_dir():
+
+    @app.get("/")
+    def root_redirect() -> RedirectResponse:
+        return RedirectResponse(url=f"{FRONTEND_BASE}/")
+
+    app.mount(FRONTEND_BASE, StaticFiles(directory=str(_DIST_DIR), html=True), name="frontend")
+
+
+def _warm_ml_cache() -> None:
+    """Pre-compute ML scores (incl. TabPFN) for every MSME so the Credit Model
+    tab is instant from the first click. Runs in a background daemon thread."""
+    try:
+        for record in MSME_DATASET.values():
+            score_enterprise(record)
+    except Exception:
+        pass
+
+
+threading.Thread(target=_warm_ml_cache, daemon=True).start()

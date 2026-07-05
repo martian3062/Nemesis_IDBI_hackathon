@@ -1,0 +1,251 @@
+#print-root {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .app-shell,
+  .chat-fab,
+  .chat-panel {
+    display: none !important;
+  }
+
+  #print-root,
+  #print-root * {
+    visibility: visible;
+  }
+
+  #print-root {
+    display: block;
+    position: absolute;
+    inset: 0;
+    padding: 24px 28px;
+    background: #ffffff;
+    color: #101820;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    font-size: 12px;
+    line-height: 1.45;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  #print-root h1 {
+    font-size: 20px;
+    color: #0c1219;
+    margin: 0;
+  }
+
+  #print-root h2 {
+    font-size: 18px;
+    margin: 0;
+  }
+
+  #print-root h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #0e9f84;
+    margin: 18px 0 8px;
+    border-bottom: 1px solid #e4eaf2;
+    padding-bottom: 4px;
+  }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #53d1b6;
+    padding-bottom: 12px;
+  }
+
+  .print-header p {
+    margin: 4px 0 0;
+    color: #687384;
+  }
+
+  .print-meta {
+    text-align: right;
+    display: grid;
+    gap: 2px;
+    color: #687384;
+    font-size: 11px;
+  }
+
+  .print-identity {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+  }
+
+  .print-identity p {
+    margin: 2px 0;
+    color: #4a5568;
+  }
+
+  .print-ask {
+    font-weight: 600;
+    color: #101820 !important;
+  }
+
+  .print-score {
+    text-align: center;
+    border: 2px solid #e4eaf2;
+    border-radius: 12px;
+    padding: 10px 22px;
+  }
+
+  .print-score strong {
+    font-size: 34px;
+    line-height: 1;
+  }
+
+  .print-score span {
+    color: #687384;
+    font-size: 12px;
+  }
+
+  .print-score b {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .print-score.good strong,
+  .print-score.good b {
+    color: #16a34a;
+  }
+
+  .print-score.watch strong,
+  .print-score.watch b {
+    color: #d97706;
+  }
+
+  .print-score.risk strong,
+  .print-score.risk b {
+    color: #dc2626;
+  }
+
+  #print-root table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  #print-root th,
+  #print-root td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  #print-root th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #687384;
+  }
+
+  #print-root td.good {
+    color: #16a34a;
+    font-weight: 700;
+  }
+
+  #print-root td.watch {
+    color: #d97706;
+    font-weight: 700;
+  }
+
+  #print-root td.risk {
+    color: #dc2626;
+    font-weight: 700;
+  }
+
+  .print-reason {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .print-reason b {
+    min-width: 34px;
+    text-align: center;
+    border-radius: 6px;
+    padding: 2px 4px;
+    font-size: 12px;
+  }
+
+  .print-reason b.good {
+    background: #dcfce7;
+    color: #16a34a;
+  }
+
+  .print-reason b.risk {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .print-reason p {
+    margin: 2px 0 0;
+    color: #4a5568;
+  }
+
+  .print-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .print-feature-grid > div {
+    border: 1px solid #e4eaf2;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: grid;
+    gap: 2px;
+  }
+
+  .print-feature-grid span {
+    font-size: 10px;
+    color: #687384;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .print-feature-grid small {
+    color: #0e9f84;
+  }
+
+  .print-footer {
+    margin-top: 20px;
+    border-top: 1px solid #e4eaf2;
+    padding-top: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+  }
+
+  .print-footer span {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #687384;
+  }
+
+  .print-footer .mono {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 11px;
+  }
+
+  .print-disclaimer {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+    color: #687384;
+    font-size: 10px;
+  }
+}

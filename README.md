@@ -8,6 +8,17 @@ The current repository contains a runnable full-stack prototype: a React + TypeS
 
 Nemesis converts AA-consented alternate data such as GST, UPI, EPFO, and bank-statement flows into an explainable MSME Financial Health Card, helping IDBI evaluate thin-file and new-to-credit businesses faster, safer, and with auditable reason codes.
 
+## Live Deployment
+
+The full prototype (React frontend + FastAPI backend, served from one process) is deployed at:
+
+```text
+http://35.255.196.78:8000/nemesis_idbi/
+API docs: http://35.255.196.78:8000/docs
+```
+
+The frontend is served under the `/nemesis_idbi` base path so it can coexist with other apps on the host; the API stays at `/api/v1/*`. The backend runs as a `systemd --user` service (`nemesis.service`) with auto-restart. Requests to `/` redirect to `/nemesis_idbi/`.
+
 ## Problem Statement
 
 Many MSMEs are creditworthy but remain under-served because traditional underwriting depends heavily on audited financials, ITR history, bureau depth, and manual document review. This creates four practical problems:
@@ -34,14 +45,18 @@ The shipped prototype includes a frontend console plus a backend scoring API.
 
 | Section | Purpose |
 | --- | --- |
-| Health Card | Shows the composite score, enterprise profile, loan request, six score dimensions, and cashflow trend |
-| Swarm | Visualizes the four-agent underwriting swarm: Perceiver, Planner, Guardian, and Recoverer |
+| Health Card | Shows the composite score, enterprise profile, loan request, six score dimensions, and cashflow trend; live sector imagery (Pexels) and one-click PDF export |
+| Credit Model | Trained ML probability-of-default model (logistic scorecard + gradient boosting): PD, credit score, coefficient reason codes, ROC/calibration/gains (D3), business-impact uplift, model card, and a Hugging Face foundation model (all-MiniLM-L6-v2, 22M) for semantic peer benchmarking |
+| What-If Lab | Interactive counterfactual simulator: six sliders recompute the score live (backend `/simulate` with an offline TypeScript scoring mirror) |
+| Portfolio | Bank-side command center: 12-MSME book, score distribution, risk tiers, and an early-warning alerts queue with click-through |
+| Swarm | Runs a real four-agent LLM swarm (Perceiver, Planner, Guardian, Recoverer) with a guarded agent-to-agent (A2A) message channel |
 | Explainability | Shows reason codes, positive/negative score drivers, and counterfactual stress tests |
-| Guardian | Demonstrates consent, policy, injection-defense, and tamper-evident audit controls |
+| Guardian | Demonstrates consent, policy, injection-defense, tamper-evident audit controls, and a recent decision-envelope trail |
 | Federated | Shows a future multi-bank federated-learning view where model learning happens without raw data pooling |
 | Architecture | Shows the consent, feature, swarm, scoring, and lending-rail workflow |
 | API | Lists live backend endpoints and connector readiness |
-| Integrations | Shows Groq, Firecrawl, Tinybird, OPA, SHAP, Great Expectations, Evidently, Qdrant/Chroma, OpenTelemetry, Presidio, Docling/Unstructured, MinIO, Zerve, and LangGraph readiness |
+| Integrations | Shows Groq, Firecrawl, TinyFish, Sarvam AI, Pinecone, Zerve AI, Pexels, OPA, SHAP, Great Expectations, Evidently, Qdrant/Chroma, OpenTelemetry, Presidio, Docling/Unstructured, MinIO, and LangGraph readiness |
+| AI Credit Officer chat | Floating panel over every screen; Groq-powered answers over the live health card with Guardian injection screening on each message |
 
 ## Implemented Backend
 
@@ -64,6 +79,14 @@ GET  /api/v1/health
 GET  /api/v1/enterprises
 GET  /api/v1/health-card?enterprise_id=suryam&scenario=baseline
 POST /api/v1/scenario/run
+POST /api/v1/simulate                # What-If Lab: recompute score with overrides
+GET  /api/v1/portfolio?scenario=baseline   # Portfolio command center
+POST /api/v1/swarm/run               # Real LLM agent swarm with guarded A2A log
+POST /api/v1/ai/chat                 # Guardian-screened AI credit officer chat
+GET  /api/v1/ml/score?enterprise_id=suryam   # Trained PD model: score + reason codes
+GET  /api/v1/ml/validation           # AUROC, KS, Gini, calibration, gains, PSI, impact
+GET  /api/v1/ml/model-card           # Model governance card
+GET  /api/v1/ml/peers?enterprise_id=suryam   # HF foundation-model semantic peers
 GET  /api/v1/connectors/snapshot
 GET  /api/v1/audit/latest
 GET  /api/v1/federated/status
@@ -79,6 +102,7 @@ GET  /api/v1/data-quality
 GET  /api/v1/document-intelligence
 GET  /api/v1/memory/status
 GET  /api/v1/ops/status
+GET  /api/v1/media/sector-image?sector=Auto+components   # Pexels imagery
 POST /api/v1/privacy/redact
 ```
 
@@ -109,7 +133,10 @@ attack     Prompt-injection and unsafe override simulation
 - Federated-learning concept for cross-bank model improvement without raw-data sharing.
 - Optional AI credit memo through Groq with deterministic fallback.
 - Optional external MSME verification through Firecrawl with fallback signals.
-- Tinybird-ready scoring event stream.
+- TinyFish agentic-web and scoring event stream.
+- Real four-agent LLM swarm with guarded agent-to-agent messaging.
+- What-If Lab counterfactual simulator and portfolio command center.
+- Guardian-screened AI credit officer chat.
 - OPA-ready external policy evaluation with local rules fallback.
 - Great Expectations-style data quality contracts.
 - Evidently-style model monitor snapshot.
@@ -125,20 +152,25 @@ All advanced integrations are demo-safe. If the API key or service is present, N
 
 | Tool | Nemesis Use | Live Unlock |
 | --- | --- | --- |
-| Groq AI | AI credit officer memo, planner rationale, borrower improvement advice | `GROQ_API_KEY` |
+| Groq AI | AI credit officer chat, credit memo, and the four-agent LLM swarm (`llama-3.1-8b-instant` / `llama-3.3-70b-versatile`) | `GROQ_API_KEY` |
 | Firecrawl | External web footprint and supplier/context verification | `FIRECRAWL_API_KEY` |
-| Tinybird | Real-time scoring and Guardian event analytics | `TINYBIRD_TOKEN`, `TINYBIRD_EVENTS_URL` |
+| TinyFish | Agentic web intelligence and real-time scoring/Guardian event stream | `TINYFISH_API_KEY`, `TINYFISH_EVENTS_URL` |
+| Sarvam AI | Vernacular (Indian-language) credit-officer answers and borrower advice, voice-ready | `SARVAM_API_KEY` |
+| Pinecone | Managed vector index for credit memos, policy docs, and decision templates | `PINECONE_API_KEY` |
+| Zerve AI | Data-science workspace for feature experiments and model validation | `ZERVE_API_KEY` |
+| Pexels | Live sector imagery for health cards and borrower-facing screens | `PEXELS_API_KEY` |
 | Open Policy Agent | External Rego policy checks for consent and auto-approval | `OPA_URL` |
 | SHAP | Future model-attribution upgrade for current reason codes | Python ML layer |
 | Great Expectations | Connector and feature data-quality validation contracts | Local contracts |
 | Evidently AI | Score drift, confidence drift, and monitoring reports | Local snapshot / future reports |
-| Qdrant / Chroma | Vector memory for credit memos, policy docs, profiles, templates | Docker or URLs |
+| Qdrant / Chroma | Self-hosted vector memory for credit memos, policy docs, profiles, templates | Docker or URLs |
 | OpenTelemetry + Grafana | Agent and scoring observability | Docker Compose |
 | Presidio | PII redaction before logs, prompts, and audit exports | Regex fallback now |
 | Docling / Unstructured | Invoice, statement, GST, and purchase-order parsing | Contract stub now |
 | MinIO | Object storage for documents and health-card exports | Docker Compose |
-| Zerve | Data science workflows and score experiment workspaces | `ZERVE_WORKSPACE_URL` |
 | LangGraph | Future graph orchestration for Perceiver -> Planner -> Guardian -> Recoverer | Design-ready |
+
+All API keys are loaded from `backend/.env` (git-ignored) by a small stdlib loader (`backend/app/env.py`); existing environment variables always win.
 
 ## Architecture
 
@@ -181,6 +213,117 @@ flowchart TB
     N[Bank / NBFC Model Nodes] --> M
 ```
 
+## Advanced System Architecture
+
+### Deployment Topology (as shipped)
+
+A single FastAPI process serves both the static React bundle (under `/nemesis_idbi`) and the JSON API (under `/api/v1`). External AI/data services are called only when their key is present; otherwise every adapter returns a deterministic fallback.
+
+```mermaid
+flowchart TB
+    subgraph Client["Browser"]
+        UI["React SPA<br/>/nemesis_idbi/"]
+    end
+
+    subgraph VM["GCP VM 35.255.196.78 : 8000 (systemd --user)"]
+        direction TB
+        RD["/ redirect -> /nemesis_idbi/"]
+        ST["StaticFiles mount<br/>/nemesis_idbi -> dist/"]
+        API["FastAPI routers<br/>/api/v1/*"]
+        ENV["env.py loads backend/.env"]
+        subgraph CORE["Domain core"]
+            SC["scoring.py"]
+            PIPE["pipeline.py"]
+            GUARD["guardian.py"]
+            SWARM["swarm.py (A2A)"]
+        end
+    end
+
+    subgraph EXT["External services (key-gated, fallback-safe)"]
+        GROQ["Groq LLMs"]
+        FC["Firecrawl"]
+        SARVAM["Sarvam AI"]
+        PINE["Pinecone"]
+        PEX["Pexels"]
+        TF["TinyFish"]
+    end
+
+    UI -->|same-origin fetch| API
+    UI --> ST
+    UI -.-> RD
+    API --> CORE
+    ENV --> CORE
+    SWARM --> GROQ
+    API --> FC & SARVAM & PINE & PEX & TF
+    API -->|deterministic fallback| UI
+```
+
+### Guarded Agent-to-Agent (A2A) Swarm
+
+Three of the four agents run on a small, fast LLM (`llama-3.1-8b-instant`); the Guardian adds a deterministic policy gate. **Every A2A message is screened before delivery** — prompt-injection scan, PII redaction, and a size cap — and a poisoned message is quarantined instead of reaching the next agent. The full annotated transcript is returned as `a2a_log`.
+
+```mermaid
+flowchart LR
+    IN["build_health_card()<br/>facts + dimensions"] --> P
+
+    subgraph AGENTS["Four-agent swarm (llama-3.1-8b-instant)"]
+        P["Perceiver<br/>data-quality report"]
+        PL["Planner<br/>loan path + mitigants"]
+        G["Guardian<br/>policy gate + LLM critique"]
+        R["Recoverer<br/>failure absorption"]
+    end
+
+    P -->|msg| GR1{{Guardrail}}
+    GR1 -->|clean| PL
+    GR1 -->|injection| Q1["QUARANTINED"]
+
+    PL -->|msg| GR2{{Guardrail}}
+    GR2 -->|clean| G
+    GR2 -->|injection| Q2["QUARANTINED"]
+
+    G -->|msg| GR3{{Guardrail}}
+    GR3 --> R
+
+    R --> OUT["a2a_log + agent outputs<br/>+ guardrail findings"]
+
+    classDef guard fill:#0e9f84,stroke:#0b3b33,color:#fff;
+    class GR1,GR2,GR3 guard;
+```
+
+Guardrails applied on **each** hop: `detect_injection()` (quarantine on hit), `redact_pii()` (mask emails/phones/PAN/account patterns), and a `MAX_A2A_CHARS` truncation cap. A deterministic policy gate also checks score threshold, consent scopes, and whether any A2A message was blocked this run.
+
+### Request Lifecycle Across the New Endpoints
+
+```mermaid
+sequenceDiagram
+    participant UI as React SPA
+    participant API as FastAPI /api/v1
+    participant Core as scoring / pipeline
+    participant Guard as guardian.py
+    participant LLM as Groq
+
+    UI->>API: POST /simulate {overrides}
+    API->>Core: dataclasses.replace + score_health_card
+    Core-->>UI: baseline vs simulated deltas
+
+    UI->>API: GET /portfolio
+    API->>Core: score all 12 MSMEs + alert rules
+    Core-->>UI: summary, distribution, alerts
+
+    UI->>API: POST /ai/chat {message}
+    API->>Guard: detect_injection(message)
+    alt injection found
+        Guard-->>UI: blocked verdict (no LLM call)
+    else clean
+        API->>LLM: chat over redacted health-card context
+        LLM-->>UI: grounded answer (or deterministic fallback)
+    end
+
+    UI->>API: POST /swarm/run
+    API->>LLM: Perceiver -> Planner -> Guardian (guarded A2A)
+    LLM-->>UI: agent outputs + a2a_log
+```
+
 ## Architectural Layers
 
 | Layer | Component | Responsibility |
@@ -196,14 +339,16 @@ flowchart TB
 
 ## Agent Swarm Design
 
-Nemesis reuses the Eraya idea of a resilient four-agent swarm, adapted for banking and MSME underwriting.
+Nemesis reuses the Eraya idea of a resilient four-agent swarm, adapted for banking and MSME underwriting. This is **implemented and live** in `backend/app/swarm.py` (`POST /api/v1/swarm/run`): Perceiver, Planner, and Guardian run on Groq's `llama-3.1-8b-instant`, and every agent-to-agent message passes a guardrail (injection scan, PII redaction, size cap) before the next agent sees it. If Groq is unreachable, each agent degrades to a deterministic response.
 
 | Agent | Role in Nemesis | Example Output |
 | --- | --- | --- |
 | Perceiver Agent | Reads consented data, detects quality gaps, maps raw signals into structured features | "GST-bank reconciliation confidence: 96%" |
 | Planner Agent | Selects scoring path, credit product, mitigants, and exposure recommendation | "Approve with buyer concentration cap" |
-| Guardian Agent | Enforces consent scope, explainability, RBI-aligned policy rules, and injection defense | "Blocked unsafe override; signed audit record" |
-| Recoverer Agent | Keeps the workflow alive when data is missing, partial, delayed, or inconsistent | "Fallback to thin-file deterministic score" |
+| Guardian Agent | Deterministic policy gate + LLM critique; enforces consent scope, explainability, and injection defense | "Blocked unsafe override; signed audit record" |
+| Recoverer Agent | Keeps the workflow alive when an agent LLM call fails or data is partial | "Fallback to thin-file deterministic score" |
+
+Guardrails on every A2A hop: `detect_injection()` quarantines poisoned messages, `redact_pii()` masks emails/phones/PAN/account numbers, and a `MAX_A2A_CHARS` cap prevents oversized payloads. The Swarm tab renders the resulting `a2a_log` with per-hop guardrail findings.
 
 ## Three-Tier Scoring Cascade
 
@@ -326,50 +471,69 @@ flowchart LR
 | Dimension radar | Which parts of the business are strong or weak? |
 | Feature tiles | Which alternate-data sources are supporting the score? |
 | Cashflow trend | Is liquidity improving, stable, or deteriorating? |
-| Swarm view | Which agent made which part of the decision? |
+| What-If Lab | Which single lever most improves this MSME's score? |
+| Portfolio | Where does the whole book sit, and which accounts need attention now? |
+| Swarm view | Which agent made which part of the decision, and were the A2A messages safe? |
+| AI Credit Officer chat | Can I just ask, in plain language, why this decision was made? |
 | Explainability view | Why did the score move up or down? |
 | Guardian view | Was the decision policy-checked and auditable? |
 | Federated view | How can the model improve without raw-data pooling? |
 
 ## Repository Structure
 
+The frontend is organized so each tab lives in its own feature directory under `src/features/`, with shared primitives in `src/components/` and pure logic in `src/lib/`.
+
 ```text
 Nemesis_IDBI_hackathon/
 |-- backend/
 |   |-- app/
 |   |   |-- connectors.py     # AA, GST, UPI, EPFO, OCEN, ULI mock connectors
-|   |   |-- data.py           # Synthetic MSME records
-|   |   |-- guardian.py       # Policy checks and HMAC audit signing
-|   |   |-- integrations.py   # Optional Groq, Firecrawl, Tinybird, OPA, monitoring, memory adapters
-|   |   |-- main.py           # FastAPI entrypoint
+|   |   |-- data.py           # 12 synthetic MSME records + scenarios
+|   |   |-- scoring.py        # Feature engineering and six-dimension scoring
+|   |   |-- guardian.py       # Policy checks, injection detection, HMAC audit signing
 |   |   |-- pipeline.py       # End-to-end health-card orchestration
-|   |   `-- scoring.py        # Feature engineering and six-dimension scoring
-|   |-- README.md
+|   |   |-- simulation.py     # What-If Lab: dataclasses.replace + re-score
+|   |   |-- portfolio.py      # Portfolio summary, distribution, alert rules
+|   |   |-- ai_chat.py        # Guardian-screened credit-officer chat (Groq + fallback)
+|   |   |-- swarm.py          # Four-agent LLM swarm with guarded A2A channel
+|   |   |-- integrations.py   # Groq, Firecrawl, TinyFish, Sarvam, Pinecone, Zerve, Pexels, ...
+|   |   |-- env.py            # Loads backend/.env without extra deps
+|   |   `-- main.py           # FastAPI entrypoint + static frontend mount
+|   |-- .env                  # Integration keys (git-ignored)
 |   `-- requirements.txt
-|-- data/
-|   `-- synthetic_msme_sample.csv
-|-- ops/
-|   |-- opa/
-|   |   `-- underwriting.rego
-|   `-- prometheus.yml
-|-- public/
-|   |-- favicon.svg
-|   `-- icons.svg
 |-- src/
+|   |-- features/             # One directory per tab
+|   |   |-- health-card/      # HealthCardTab + PrintableHealthCard + print.css
+|   |   |-- simulator/        # SimulatorTab (What-If Lab)
+|   |   |-- portfolio/        # PortfolioTab (command center)
+|   |   |-- swarm/            # SwarmTab (live A2A swarm)
+|   |   |-- explainability/   # ExplainabilityTab
+|   |   |-- guardian/         # GuardianTab
+|   |   |-- federated/        # FederatedTab
+|   |   |-- architecture/     # ArchitectureTab
+|   |   |-- api/              # ApiTab
+|   |   |-- integrations/     # IntegrationsTab
+|   |   `-- chat/             # CreditOfficerChat (slide-over panel)
+|   |-- components/
+|   |   |-- layout/           # Sidebar, TopBar, nav-items
+|   |   |-- charts/           # Radar, Sparkline
+|   |   `-- ui/               # MotionCard, AnimatedNumber
 |   |-- lib/
-|   |   `-- nemesis-api.ts    # Frontend API client with fallback behavior
-|   |-- App.tsx              # Main Nemesis prototype UI
+|   |   |-- nemesis-api.ts    # API client (same-origin aware, fallback behavior)
+|   |   |-- scoring-local.ts  # TypeScript mirror of scoring.py for offline mode
+|   |   |-- fallback-data.ts  # Static swarm/events/federated demo data
+|   |   `-- format.ts         # Score tone, clamp, scenario helpers
+|   |-- types.ts             # Shared TypeScript types
+|   |-- theme.css            # Design tokens (CSS variables)
+|   |-- App.tsx              # Shell: sidebar + topbar + tab router
 |   |-- App.css              # Product dashboard styling
-|   |-- index.css            # Global CSS reset and app base
 |   `-- main.tsx             # React entrypoint
+|-- data/synthetic_msme_sample.csv
+|-- ops/opa/underwriting.rego, ops/prometheus.yml
 |-- index.html
 |-- docker-compose.yml
-|-- Dockerfile.frontend
-|-- .env.example
+|-- vite.config.ts           # base: '/nemesis_idbi/'
 |-- package.json
-|-- package-lock.json
-|-- tsconfig.json
-|-- vite.config.ts
 `-- README.md
 ```
 
@@ -377,17 +541,16 @@ Nemesis_IDBI_hackathon/
 
 Current prototype:
 
-- React 19
-- TypeScript
-- Vite
-- Lucide React icons
-- Custom SVG-based radar and sparkline visualizations
-- Responsive CSS for desktop and mobile layouts
-- FastAPI backend
-- deterministic MSME score engine
-- mock AA, GST, UPI, EPFO, OCEN, and ULI connector payloads
-- Guardian policy engine with HMAC audit signing
-- synthetic MSME data sample
+- React 19 + TypeScript + Vite (base path `/nemesis_idbi/`)
+- Framer Motion (tab transitions, animated score counters, spring chat panel)
+- Recharts (portfolio distribution) + custom SVG radar/sparkline
+- Sora + Inter typography over a CSS design-token theme
+- FastAPI backend serving both the API and the built frontend from one process
+- Deterministic six-dimension score engine, mirrored in TypeScript for offline mode
+- Real four-agent LLM swarm (Groq `llama-3.1-8b-instant`) with guarded A2A messaging
+- Guardian policy engine with injection detection and HMAC audit signing
+- 12-MSME synthetic dataset, mock AA/GST/UPI/EPFO/OCEN/ULI payloads
+- Live integrations: Groq, Firecrawl, Sarvam AI, Pinecone, Zerve AI, TinyFish, Pexels
 - Docker Compose stack for backend, frontend, OPA, Qdrant, Chroma, MinIO, Prometheus, Grafana, and Jaeger
 
 Target production stack:
@@ -431,7 +594,29 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The frontend automatically uses `http://127.0.0.1:8000` when the backend is running. If the backend is off, the UI falls back to static demo data.
+The frontend automatically uses `http://127.0.0.1:8000` when running under the Vite dev server (port 5173); anywhere else it uses same-origin API calls. If the backend is off, the UI falls back to static demo data and the local scoring mirror.
+
+## Build and Deploy (single-process)
+
+Build the frontend and serve everything from FastAPI on one port:
+
+```powershell
+npm run build          # emits dist/ with base '/nemesis_idbi/'
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Then open `http://<host>:8000/nemesis_idbi/`. FastAPI mounts `dist/` under `/nemesis_idbi` and redirects `/` to it; the API stays at `/api/v1/*`.
+
+Redeploy to the demo VM after changes:
+
+```powershell
+npm run build
+# package backend/ (app, requirements.txt, .env) + dist/, scp to the VM, extract into ~/nemesis
+ssh -i ~/.ssh/evolet_rsa pardeep@35.255.196.78 "systemctl --user restart nemesis.service"
+```
+
+The VM runs Nemesis as a `systemd --user` service (`~/.config/systemd/user/nemesis.service`) with `Restart=on-failure`. Run `sudo loginctl enable-linger pardeep` once so the service also survives a reboot with no active login.
 
 ## Full Integrated Demo Stack
 
